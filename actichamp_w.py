@@ -1,0 +1,995 @@
+# -*- coding: utf-8 -*-
+"""
+Python wrapper for ActiChamp Windows library
+
+ActiChamp_x86.dll (32-Bit) and ActiChamp_x64.dll (64-Bit)
+PyCorder ActiChamp Recorder
+
+------------------------------------------------------------
+
+Copyright (C) 2010, Brain Products GmbH, Gilching
+
+This file is part of PyCorder
+
+PyCorder is free software: you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
+
+------------------------------------------------------------
+
+@author: Norbert Hauser
+@version: 1.0
+"""
+
+import ctypes
+import ctypes.wintypes
+import _ctypes
+import numpy as np
+import time
+import configparser
+import platform
+
+
+# max integer
+INT32_MAX = 2 ** 31 - 1
+
+ADC_MAX = 0x7FFFFF
+
+# required hardware DLL version
+# CHAMP_VERSION = 0x080B0519          # 08.11.05.25 DLL
+# CHAMP_VERSION = 0x090B0B07          # 09.11.11.07 DLL
+# CHAMP_VERSION = 0x0A0B0C02          # 10.11.12.02 DLL
+# CHAMP_VERSION = 0x0A0B0C17          # 10.11.12.23 DLL
+# CHAMP_VERSION = 0x0A0B0C1D          # 10.11.12.29 DLL
+# CHAMP_VERSION = 0x0B0C0A02          # 11.12.10.02 DLL
+# CHAMP_VERSION = 0x110C0B10          # 17.12.11.16 DLL
+# CHAMP_VERSION = 0x120D0710          # 18.13.07.16 DLL
+# CHAMP_VERSION = 0x160D0B0E          # 22.13.11.14 DLL
+# CHAMP_VERSION = 0x170E040F           # 23.14.04.15 DLL
+# CHAMP_VERSION = 0x190E0804  # 25.14.08.04 DLL
+CHAMP_VERSION = 0x1D13060B  # 29.19.6.11
+
+# required firmware versions (board revision 4)
+CHAMP_4_VERSION_CTRL = 0x040B041C  # 04.11.04.28 FX2 USB controller
+CHAMP_4_VERSION_FPGA = 0x2C000000  # 44.00.00.00 FPGA
+CHAMP_4_VERSION_DSP = 0x060B0519  # 06.11.05.25 MSP430
+
+# required firmware versions (board revision 6)
+CHAMP_6_VERSION_CTRL = 0x660F0609  # 102.15.06.09 FX2 USB controller
+CHAMP_6_VERSION_FPGAM = 0x30000000  # 48.00.00.00 FPGA media controller
+CHAMP_6_VERSION_FPGAC = 0x2D000000  # 45.00.00.00 FPGA carrier board
+CHAMP_6_VERSION_DSP = 0x690E0A07  # 105.14.10.07  MSP430
+
+# compensate constant trigger delay
+CHAMP_COMPTRIGGER = False
+
+# C error numbers
+CHAMP_ERR_OK = 0  # Success (no errors)
+CHAMP_ERR_HANDLE = -1  # Invalid handle (such handle not present now)
+CHAMP_ERR_PARAM = -2  # Invalid function parameter(s)
+CHAMP_ERR_FAIL = -3  # Function fail (internal error)
+CHAMP_ERR_MONITORING = -4  # data rate monitoring failed
+CHAMP_ERR_SUPPORT = -5  # function not supported
+
+# ADC data filter enum
+CHAMP_ADC_NATIVE = 0  # no ADC data filter
+CHAMP_ADC_AVERAGING_2 = 1  # ADC data moving average filter by 2 samples
+
+# ADC data decimation
+CHAMP_DECIMATION_0 = 0  # no decimation
+CHAMP_DECIMATION_2 = 2  # decimation by 2
+CHAMP_DECIMATION_5 = 5  # decimation by 5
+CHAMP_DECIMATION_10 = 10  # decimation by 10
+CHAMP_DECIMATION_20 = 20  # decimation by 20
+CHAMP_DECIMATION_50 = 50  # decimation by 50
+
+# Mode enum
+CHAMP_MODE_NORMAL = 0  # normal data acquisition
+CHAMP_MODE_ACTIVE_SHIELD = 1  # data acquisition with ActiveShield
+CHAMP_MODE_IMPEDANCE = 2  # impedance measure
+CHAMP_MODE_TEST = 3  # test signal (square wave 200 uV, 1 Hz)
+CHAMP_MODE_LED_TEST = 99  # active electrode LED test mode
+
+# Mode text
+CHAMP_Modes = {CHAMP_MODE_NORMAL: "acquisition",
+               CHAMP_MODE_ACTIVE_SHIELD: "acquisition with shield",
+               CHAMP_MODE_IMPEDANCE: "impedance measurement",
+               CHAMP_MODE_TEST: "test signal",
+               CHAMP_MODE_LED_TEST: "active electrode LED test"}
+
+# actiChamp base sample rate enum
+CHAMP_RATE_10KHZ = 0  # 10 kHz, all channels (default mode)
+CHAMP_RATE_50KHZ = 1  # 50 kHz
+CHAMP_RATE_100KHZ = 2  # 100 kHz, max 64 channels
+# actiChamp base sample rate for extended settings enum
+CHAMP_RATE_25KHZ = 10  # 25 kHz
+CHAMP_RATE_5KHZ = 11  # 5 kHz
+CHAMP_RATE_2KHZ = 12  # 2 kHz
+CHAMP_RATE_1KHZ = 13  # 1 kHz
+CHAMP_RATE_500HZ = 14  # 500 Hz
+CHAMP_RATE_200HZ = 15  # 200 Hz
+
+# sample rate frequency dictionary (amplifier DLL base frequencies available for the application)
+# if you want to do the decimation and filtering in Python (amplifier.py) then
+# set this value to True:
+PythonDecimation = False
+if PythonDecimation:
+    sample_rate = {
+        CHAMP_RATE_10KHZ: 10000.0,
+        CHAMP_RATE_50KHZ: 50000.0,
+        CHAMP_RATE_100KHZ: 100000.0
+    }
+else:
+    sample_rate = {
+        CHAMP_RATE_200HZ: 200.0, CHAMP_RATE_500HZ: 500.0, CHAMP_RATE_1KHZ: 1000.0,
+        CHAMP_RATE_2KHZ: 2000.0, CHAMP_RATE_5KHZ: 5000.0,
+        CHAMP_RATE_10KHZ: 10000.0, CHAMP_RATE_25KHZ: 25000.0,
+        CHAMP_RATE_50KHZ: 50000.0, CHAMP_RATE_100KHZ: 100000.0
+    }
+
+# trigger delay dictionary (for constant trigger delay compensation)
+trigger_delay = {
+    CHAMP_RATE_200HZ: 1, CHAMP_RATE_500HZ: 1, CHAMP_RATE_1KHZ: 1,
+    CHAMP_RATE_2KHZ: 1, CHAMP_RATE_5KHZ: 1,
+    CHAMP_RATE_10KHZ: 1, CHAMP_RATE_25KHZ: 1,
+    CHAMP_RATE_50KHZ: 1, CHAMP_RATE_100KHZ: 1}
+
+# sample rate extended settings dictionary
+# translate application base frequency to amplifier physical frequency
+# 0=10kHz, 1=50kHz, 2=100kHz
+sample_rate_settings = {
+    CHAMP_RATE_200HZ: 0, CHAMP_RATE_500HZ: 0, CHAMP_RATE_1KHZ: 0,
+    CHAMP_RATE_2KHZ: 0, CHAMP_RATE_5KHZ: 0,
+    CHAMP_RATE_10KHZ: 0, CHAMP_RATE_25KHZ: 1,
+    CHAMP_RATE_50KHZ: 1, CHAMP_RATE_100KHZ: 2}
+# decimation values (rate = physical / decimation)
+sample_rate_decimation = {
+    CHAMP_RATE_200HZ: CHAMP_DECIMATION_50, CHAMP_RATE_500HZ: CHAMP_DECIMATION_20, CHAMP_RATE_1KHZ: CHAMP_DECIMATION_10,
+    CHAMP_RATE_2KHZ: CHAMP_DECIMATION_5, CHAMP_RATE_5KHZ: CHAMP_DECIMATION_2,
+    CHAMP_RATE_10KHZ: CHAMP_DECIMATION_0, CHAMP_RATE_25KHZ: CHAMP_DECIMATION_2,
+    CHAMP_RATE_50KHZ: CHAMP_DECIMATION_0, CHAMP_RATE_100KHZ: CHAMP_DECIMATION_0}
+
+
+class CHAMP_SETTINGS(ctypes.Structure):
+    """ C amplifier settings
+    """
+    _pack_ = 1
+    _fields_ = [("Mode", ctypes.c_int),  # mode of acquisition
+                ("Rate", ctypes.c_int)]  # sample rate
+
+
+class CHAMP_SETTINGS_EX(ctypes.Structure):
+    """ C extended amplifier settings
+    """
+    _pack_ = 1
+    _fields_ = [("Mode", ctypes.c_int),  # mode of acquisition
+                ("Rate", ctypes.c_int),  # sample rate
+                ("AdcFilter", ctypes.c_int),  # ADC data filter
+                ("Decimation", ctypes.c_int)]  # ADC data decimation
+
+
+class CHAMP_PROPERTIES(ctypes.Structure):
+    """ C amplifier properties
+    """
+    _pack_ = 1
+    _fields_ = [("CountEeg", ctypes.c_uint),  # number of Eeg channels
+                ("CountAux", ctypes.c_uint),  # number of Aux channels
+                ("TriggersIn", ctypes.c_uint),  # numbers of input triggers
+                ("TriggersOut", ctypes.c_uint),  # numbers of output triggers
+                ("Rate", ctypes.c_float),  # sampling rate, Hz
+                ("ResolutionEeg", ctypes.c_float),  # EEG amplitude scale coefficients, V/bit
+                ("ResolutionAux", ctypes.c_float),  # AUX amplitude scale coefficients, V/bit
+                ("RangeEeg", ctypes.c_float),  # EEG input range peak-peak, V
+                ("RangeAux", ctypes.c_float)]  # AUX input range peak-peak, V
+
+
+class CHAMP_IMPEDANCE_SETUP(ctypes.Structure):
+    """ C impedance settings
+    """
+    _pack_ = 1
+    _fields_ = [("Good", ctypes.c_uint),  # Good level (green led indication), Ohm
+                ("Bad", ctypes.c_uint),  # Bad level (red led indication), Ohm
+                ("LedsDisable", ctypes.c_uint),  # Disable electrode's leds, if not zero
+                ("TimeOut", ctypes.c_uint)]  # Impedance mode time-out (0 - 65535), sec
+
+
+class CHAMP_DATA_STATUS(ctypes.Structure):
+    """ C device data status
+    """
+    _pack_ = 1
+    _fields_ = [("Samples", ctypes.c_uint),  # Total samples
+                ("Errors", ctypes.c_uint),  # Total errors
+                ("Rate", ctypes.c_float),  # Data rate, Hz
+                ("Speed", ctypes.c_float)]  # Data speed, MB/s
+
+
+class CHAMP_SYSTEMTIME(ctypes.Structure):
+    """ C system time struct
+    """
+    _pack_ = 1
+    _fields_ = [('wYear', ctypes.wintypes.WORD),
+                ('wMonth', ctypes.wintypes.WORD),
+                ('wDayOfWeek', ctypes.wintypes.WORD),
+                ('wDay', ctypes.wintypes.WORD),
+                ('wHour', ctypes.wintypes.WORD),
+                ('wMinute', ctypes.wintypes.WORD),
+                ('wSecond', ctypes.wintypes.WORD),
+                ('wMilliseconds', ctypes.wintypes.WORD)]
+
+
+class CHAMP_MODULE_INFO(ctypes.Structure):
+    """ C device and module info
+    """
+    _pack_ = 1
+    _fields_ = [('Model', ctypes.c_uint),  # Model ID
+                ('SerialNumber', ctypes.c_uint),  # Serial Number
+                ('Date', CHAMP_SYSTEMTIME)]  # Production Date and Time
+
+
+CHAMP_DEVICE_INFO = CHAMP_MODULE_INFO * 6  # index 0=device, index 1-5=modules
+
+
+class CHAMP_VERSION_INFO(ctypes.Structure):
+    """ C DLL, USB driver and firmware versions
+    """
+    _pack_ = 1
+    _fields_ = [('DLL', ctypes.wintypes.DWORD),  # DLL version
+                ('USBDRV', ctypes.wintypes.DWORD),  # USB driver version
+                ('USBCTRL', ctypes.wintypes.DWORD),  # USB controller firmware version
+                ('FPGA', ctypes.wintypes.DWORD),  # FPGA firmware version
+                ('DSP', ctypes.wintypes.DWORD)]  # MSP430 firmware version
+
+
+class CHAMP_VERSION_INFO_EXT(ctypes.Structure):
+    """ C DLL, USB driver and firmware versions for board revision 6
+    """
+    _pack_ = 1
+    _fields_ = [('DLL', ctypes.wintypes.DWORD),  # DLL version
+                ('USBDRV', ctypes.wintypes.DWORD),  # USB driver version
+                ('USBCTRL', ctypes.wintypes.DWORD),  # USB controller firmware version
+                ('FPGAM', ctypes.wintypes.DWORD),  # Media converter FPGA firmware version
+                ('DSP', ctypes.wintypes.DWORD),  # MSP430 firmware version
+                ('FPGAC', ctypes.wintypes.DWORD)]  # Carrier board FPGA firmware version
+
+
+class CHAMP_VOLTAGES(ctypes.Structure):
+    """ C Amplifier voltages and temperature
+    The voltages DVDD3, AVDD3, AVDD5 and REF are valid only during data acquisition
+    """
+    _pack_ = 1
+    _fields_ = [('VDC', ctypes.c_float),  # Power supply, [V]
+                ('V3', ctypes.c_float),  # Internal 3.3, [V]
+                ('TEMP', ctypes.c_float),  # Temperature, degree Celsius
+                ('DVDD3', ctypes.c_float),  # Digital 3.3, [V]
+                ('AVDD3', ctypes.c_float),  # Analog 3.3, [V]
+                ('AVDD5', ctypes.c_float),  # Analog 5.0, [V]
+                ('REF', ctypes.c_float)]  # Reference 2.048, [V]
+
+
+class CHAMP_MODULES(ctypes.Structure):
+    """ C Module control structure
+    Bits:
+    0 - AUX module
+    1 - 5 - Main EEG modules (1 - 5)
+    6 - 31 - Reserved
+    """
+    _pack_ = 1
+    _fields_ = [('Present', ctypes.c_uint),  # Bits indicate that the module is present in hardware
+                ('Enabled', ctypes.c_uint)]  # Bits indicate that the module is enabled for use
+
+
+class CHAMP_PLL(ctypes.Structure):
+    """ C PLL Parameters
+    """
+    _pack_ = 1
+    _fields_ = [('PllExternal', ctypes.c_uint),  # if 1 - use External clock for PLL, if 0 - use Internal 48 MHz
+                ('AdcExternal', ctypes.c_uint),  # if 1 - out External clock to ADC, if 0 - use PLL output
+                ('PllFrequency', ctypes.c_uint),  # PLL frequency 10 MHz - 27 MHz (needs set if AdcExternal = 0), Hz
+                ('PllPhase', ctypes.c_uint),  # Phase shift (hardware step 360 / 10 = 36), degrees
+                ('Status', ctypes.c_uint)]  # PLL status (read only)
+
+
+class AmpError(Exception):
+    """
+    Generic amplifier exception
+    """
+
+    def __init__(self, value, errornr=0):
+        errortext = ""
+        if errornr == CHAMP_ERR_HANDLE:
+            errortext = "Invalid handle (device disconnected)"
+        elif errornr == CHAMP_ERR_PARAM:
+            errortext = "Invalid function parameter(s)"
+        elif errornr == CHAMP_ERR_FAIL:
+            errortext = "Function fail (internal error)"
+        elif errornr == CHAMP_ERR_MONITORING:
+            errortext = "Data rate mismatch"
+        elif errornr == CHAMP_ERR_SUPPORT:
+            errortext = "Function is not supported"
+        errortext = errortext + " :%i" % errornr
+        if errornr != 0:
+            self.value = f"actiChamp: {str(value)} -> {errortext}"
+        else:
+            self.value = f"actiChamp: {str(value)}"
+
+    def __str__(self):
+        return self.value
+
+
+class AmpVersion:
+    def __init__(self):
+        self.version = CHAMP_VERSION_INFO()
+        self.versionext = CHAMP_VERSION_INFO_EXT()
+        self.boardRevision = 4
+
+    def read(self, lib, device):
+        """
+        read board dependent version infos from amplifier
+        attention: the carrier board FPGA version (FPGAC) is only available if the acquisition is running.
+        @param lib: DLL handle
+        @param device: device handle
+        @return: DLL result value
+        """
+        res = lib.champGetVersion(device, ctypes.byref(self.version))
+        DSP_MajorVersion = self.version.DSP >> 24
+        if DSP_MajorVersion >= 100:
+            # board revision 6
+            self.boardRevision = 6
+        elif DSP_MajorVersion > 0:
+            self.boardRevision = 4
+        else:
+            self.boardRevision = 0
+        return res
+
+    def DLL(self):
+        """
+        get the DLL version
+        """
+        return self.version.DLL
+
+    def isFpgaProgrammed(self):
+        if self.boardRevision and self.version.FPGA == 0:
+            return False
+        return True
+
+    def readext(self, lib, device):
+        """
+        read version info for amplifier board revision 6
+        attention: the carrier board FPGA version (FPGAC) is only available if the acquisition is running.
+        @param lib: DLL handle
+        @param device: device handle
+        @return: DLL result value
+        """
+        res = lib.champGetVersion(device, ctypes.byref(self.version))
+        if self.boardRevision == 6:
+            res = lib.champGetVersionExt(device, ctypes.byref(self.versionext))
+        return res
+
+    def revision(self):
+        """
+        get the amplifier revision, depending on board revision
+        """
+        if self.boardRevision > 4:
+            return 3
+        return 2
+
+
+class ActiChamp:
+    """
+    ActiChamp hardware object (Python wrapper for actiCHamp Windows DLL)
+    """
+
+    def __init__(self):
+        """
+        Constructor
+        """
+        # get OS architecture (32/64-bit)
+        self.x64 = ("64" in platform.architecture()[0])
+
+        # set default values
+        self.devicehandle = 0
+        self.ampversion = AmpVersion()  #: actiCHamp version info structure
+        self.deviceinfo = CHAMP_DEVICE_INFO()  #: actiCHamp device info structure
+        self.modulestate = CHAMP_MODULES()  #: actiCHamp module connection state structure
+        self.properties = CHAMP_PROPERTIES()  #: actiCHamp property structure
+        self.settings = CHAMP_SETTINGS()  #: actiCHamp settings structure
+        self.settings.Rate = CHAMP_RATE_10KHZ  #: sampling rate
+        self.settings.Mode = CHAMP_MODE_NORMAL  #: acquisition mode
+        self.running = False  #: data acquisition running
+        self.buffer = ctypes.create_string_buffer(10000 * 1024)  #: raw data transfer buffer
+        self.impbuffer = ctypes.create_string_buffer(1000)  #: impedance raw data transfer buffer
+        self.readError = False  #: an error occurred during data acquisition
+        self.activeShieldGain = 5  #: default active shield gain
+        self.enablePllConfiguration = False  #: enable the PLL configuration option
+        self.PllExternal = 0  #: use external input for the PLL
+
+        # binning buffer for max. 100 samples with 170 channels with a datasize of int32 (4 bytes)
+        self.binning_buffer = ctypes.create_string_buffer(100 * 170 * 4)  #: binning buffer
+        self.binning = 1  #: binning size for buffer alignment
+        self.binning_offset = 0  #: raw data buffer offset in bytes for binning
+
+        self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
+        self.BlockingMode = True  #: read data in blocking mode
+        self.EmulationMode = False  #: emulate hardware
+
+        # set default properties
+        self.properties.CountEeg = 32
+        self.properties.CountAux = 8
+        self.properties.TriggersIn = 8
+        self.properties.TriggersOut = 8
+        self.properties.Rate = 10000.0
+        self.properties.ResolutionEeg = 4.88e-08
+        self.properties.ResolutionAux = 2.98e-07
+        self.properties.RangeEeg = 0.819
+        self.properties.RangeAux = 5.0
+
+        # load ActiChamp 32 or 64 bit windows library
+        self.lib = None
+        self.loadLib()
+
+        # get and check DLL version
+        self.ampversion.read(self.lib, self.devicehandle)
+        if self.ampversion.DLL() != CHAMP_VERSION:
+            raise AmpError("wrong ActiChamp DLL version (%X / %X)" % (self.ampversion.DLL(),
+                                                                      CHAMP_VERSION))
+
+        # try to open device and get device properties
+        try:
+            # get hardware properties
+            self.open()
+            self.getDeviceInfo()
+        except:
+            pass
+
+        try:
+            self.close()
+        except:
+            pass
+
+    def loadLib(self):
+        """
+        Load windows library
+        """
+        # load ActiChamp 32 or 64 bit windows library
+        try:
+            # unload existing library
+            if self.lib is not None:
+                _ctypes.FreeLibrary(self.lib._handle)
+                # load/reload library
+            if self.x64:
+                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll"
+                self.lib = ctypes.windll.LoadLibrary(path)
+                self.lib.champOpen.restype = ctypes.c_uint64
+            else:
+                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll"
+                self.lib = ctypes.windll.LoadLibrary(path)
+        except:
+            self.lib = None
+            if self.x64:
+                raise AmpError("failed to open library (ActiChamp_x64.dll)")
+            else:
+                raise AmpError("failed to open library (ActiChamp_x86.dll)")
+
+    def open(self):
+        """
+        Open the hardware device and get a device handle and device properties
+        """
+        if self.running:
+            return
+        if self.lib is None:
+            raise AmpError("library ActiChamp_x86.dll not available")
+
+        # check if device hardware is available
+        self._resetDeviceProperties()
+
+        if self.lib.champGetCount() == 0:
+            raise AmpError("hardware not available")
+
+        retry = 3
+        while retry > 0:
+
+            # open the first available device
+            if self.x64:
+                self.devicehandle = ctypes.c_uint64(self.lib.champOpen(0))
+            else:
+                self.devicehandle = ctypes.c_int32(self.lib.champOpen(0))
+
+            if self.devicehandle.value == 0:
+                self.devicehandle = 0
+                raise AmpError("failed to open device")
+
+            # get device version info
+            err = self.ampversion.read(self.lib, self.devicehandle)
+            if err != CHAMP_ERR_OK:
+                self.close()
+                raise AmpError("failed to get device version info", err)
+
+            # check if fpga loaded successfully
+            if not self.ampversion.isFpgaProgrammed():
+                self.lib.champClose(self.devicehandle)
+                self.devicehandle = 0
+                retry -= 1
+                if retry == 0:
+                    raise AmpError("failed to open device")
+            else:
+                retry = 0
+
+        # get device module connection info
+        self.modulestate.Enabled = 0
+        self.modulestate.Present = 0
+        self.lib.champGetModules(self.devicehandle, ctypes.byref(self.modulestate))
+
+        # get device properties
+        self.lib.champGetProperty(self.devicehandle, ctypes.byref(self.properties))
+
+    def _resetDeviceProperties(self):
+        """
+        Set channel count to zero
+        """
+        self.properties.CountEeg = 0
+        self.properties.CountAux = 0
+        self.properties.TriggersIn = 0
+        self.properties.TriggersOut = 0
+
+    def getDeviceInfo(self):
+        """
+        Read ID, serial number and production date from device and all connected modules
+        """
+        if self.devicehandle == 0 or self.running or self.getEmulationMode() != 0:
+            return
+
+        # reset the info structure
+        self.deviceinfo = CHAMP_DEVICE_INFO()
+
+        # power up device
+        self.setup(CHAMP_MODE_NORMAL, CHAMP_RATE_10KHZ, 1)
+        self.start()
+
+        # read the amplifier extended versions to get the carrier board FPGA version also
+        self.ampversion.readext(self.lib, self.devicehandle)
+
+        # get infos from device
+        module = -1
+        for info in self.deviceinfo:
+            # get device info
+            if module == -1:
+                self.lib.champFactoryDeviceProductionGet(self.devicehandle, ctypes.byref(info))
+            else:
+                self.lib.champFactoryModuleProductionGet(self.devicehandle, module, ctypes.byref(info))
+            module += 1
+
+        # power down device
+        self.stop()
+
+    def start(self):
+        """
+        Start data acquisition
+        """
+        if self.running:
+            return
+        if self.devicehandle == 0:
+            raise AmpError("device not open")
+
+        # start amplifier
+        err = self.lib.champStart(self.devicehandle)
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to start device", err)
+
+        # read the amplifier extended versions to get the carrier board FPGA version also
+        self.ampversion.readext(self.lib, self.devicehandle)
+
+        # get infos from device
+        self.deviceinfo = CHAMP_DEVICE_INFO()  # reset the info structure
+        module = -1
+        for info in self.deviceinfo:
+            # get device info
+            if module == -1:
+                self.lib.champFactoryDeviceProductionGet(self.devicehandle, ctypes.byref(info))
+            else:
+                self.lib.champFactoryModuleProductionGet(self.devicehandle, module, ctypes.byref(info))
+            module += 1
+
+        self.running = True
+        self.readError = False
+        self.sampleCounterAdjust = 0
+        self.BlockTimer = time.process_time()
+
+        # try to set the PLL input
+        self.setPllInput()
+
+        # reset signal generator
+        self.DummySignals = []
+
+    def close(self):
+        """
+        Close hardware device
+        """
+        if self.lib is None:
+            raise AmpError("library ActiChamp_x86.dll not available")
+        if self.devicehandle != 0:
+            if self.running:
+                try:
+                    self.stop()
+                except:
+                    pass
+            self.lib.champClose(self.devicehandle)
+        self.devicehandle = 0
+
+    def stop(self):
+        """
+        Stop data acquisition
+        """
+        if not self.running:
+            return
+        self.running = False
+        if self.devicehandle == 0:
+            raise AmpError("device not open")
+        err = self.lib.champStop(self.devicehandle)
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to stop device", err)
+
+    # ToDo: write test case for this method
+    def getEmulationMode(self):
+        """
+        Lookup emulation and PLL configuration flag in INI file
+        @return: number of modules if in emulation mode, else 0
+        """
+        emulation = 0
+        modules = 0
+        try:
+            ini = configparser.ConfigParser()
+            if self.x64:
+                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll.ini"
+                # filename = "ActiChamp_x64.dll.ini"
+            else:
+                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll.ini"
+                # filename = "ActiChamp_x86.dll.ini"
+
+            if len(ini.read(filename)) > 0:
+                emulation = ini.getint("Main", "Emulation")
+                if emulation != 0:
+                    modules = ini.getint("Emulation", "Model") / 32
+                try:
+                    self.enablePllConfiguration = ini.getint("Main", "EnablePllConfiguration") != 0
+                except:
+                    self.enablePllConfiguration = False
+        except:
+            modules = 0
+        self.EmulationMode = (modules > 0)
+        return modules
+
+    def setup(self, mode, rate, binning):
+        """
+        Prepare device for acquisition
+        @param mode: device mode, one of CHAMP_MODE_ values
+        @param rate: device sampling rate, one of CHAMP_RATE_ values
+        @param binning: sampling rate divider to align read buffer to requested binning size
+        """
+        # LED test is done in normal recording mode
+        if mode == CHAMP_MODE_LED_TEST:
+            self.settings.Mode = CHAMP_MODE_NORMAL
+        else:
+            self.settings.Mode = mode
+        self.settings.Rate = rate
+        self.binning = int(binning)
+        self.binning_offset = 0
+        if self.devicehandle == 0:
+            raise AmpError("device not open")
+
+        # setup amplifier
+        ex_settings = self._get_settings_ex(self.settings)
+
+        # limit the number of modules (1xEEG + AUX) if sampling rate is 100KHz
+        if self.settings.Rate == CHAMP_RATE_100KHZ:
+            self.modulestate.Enabled = self.modulestate.Present & 0x03
+        # limit the number of modules (2xEEG + AUX) if sampling rate is 50KHz
+        elif self.settings.Rate == CHAMP_RATE_50KHZ:
+            self.modulestate.Enabled = self.modulestate.Present & 0x07
+        # limit the number of modules (4xEEG + AUX) if sampling rate is 25KHz
+        elif self.settings.Rate == CHAMP_RATE_25KHZ:
+            self.modulestate.Enabled = self.modulestate.Present & 0x1F
+        # enable all present modules if sampling rate is below 25KHz
+        else:
+            self.modulestate.Enabled = self.modulestate.Present
+
+        # start impedance measurement always with 10KHz
+        if ex_settings.Mode == CHAMP_MODE_IMPEDANCE:
+            ex_settings.Rate = CHAMP_RATE_10KHZ
+            ex_settings.Decimation = CHAMP_DECIMATION_0
+
+        # enable modules
+        err = self.lib.champSetModules(self.devicehandle, ctypes.byref(self.modulestate))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to setup module selection", err)
+
+        # setup device
+        err = self.lib.champSetSettingsEx(self.devicehandle, ctypes.byref(ex_settings))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to setup device", err)
+
+        # set active shield gain
+        gain = ctypes.c_uint(self.activeShieldGain)  # 1-100, default = 100
+        err = self.lib.champSetActiveShieldGain(self.devicehandle, gain)
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set active shield gain", err)
+
+        # get device properties
+        self._resetDeviceProperties()
+        self.lib.champGetProperty(self.devicehandle, ctypes.byref(self.properties))
+
+        # create constant trigger delay compensation buffer
+        trgdelay = trigger_delay[self.settings.Rate]
+        self.trgdelaybuf = np.zeros(trgdelay, np.uint32) + 0xFFFF
+
+    def read(self, indices, eegcount, auxcount):
+        """
+        Read data from device
+        @param indices: to select the requested channels from raw data stream
+        @param eegcount: number of requested EEG channels
+        @param auxcount: number of requested AUX channels
+        @return: list of np arrays for channel data, trigger channel and sample counter,
+                 indices of disconnected channels
+        """
+        if not self.running or (self.devicehandle == 0) or self.readError:
+            return None, None
+
+        # calculate data amount for an interval of
+        interval = 0.05  # interval in [s]
+        bytes_per_sample = (self.properties.CountEeg + self.properties.CountAux + 1 + 1) * \
+                           np.dtype(np.int32).itemsize
+        requestedbytes = int(bytes_per_sample * sample_rate[self.settings.Rate] * interval)
+
+        t = time.process_time()
+
+        # read data from device
+        if not self.BlockingMode:
+            bytesread = self.lib.champGetData(self.devicehandle,
+                                              ctypes.byref(self.buffer, self.binning_offset),
+                                              len(self.buffer) - self.binning_offset)
+        else:
+            bytesread = self.lib.champGetDataBlocking(self.devicehandle,
+                                                      ctypes.byref(self.buffer, self.binning_offset),
+                                                      requestedbytes)
+        blocktime = (time.process_time() - self.BlockTimer)
+        self.BlockTimer = time.process_time()
+
+        # print(str(blocktime) + " : " + str(bytesread))
+        # print(str(t-self.lastt) + " : " + str(bytesread))
+        # self.lastt = t
+
+        # check for device error
+        if bytesread < 0:
+            if bytesread == CHAMP_ERR_MONITORING:
+                return None, CHAMP_ERR_MONITORING
+            self.readError = True  # block next read access, until acquisition is restarted
+            raise AmpError("failed to read data from device", bytesread)
+
+        # data available?
+        if bytesread == 0:
+            return None, None
+
+        if self.binning > 1:
+            # align buffer to requested binning size
+            total_bytes = bytesread + self.binning_offset
+            # copy remainder from last read back to sample buffer
+            ctypes.memmove(self.buffer, self.binning_buffer, self.binning_offset)
+            # new remainder size
+            remainder = ((total_bytes / bytes_per_sample) % self.binning) * bytes_per_sample
+            # number of binning aligned samples
+            binning_samples = total_bytes / bytes_per_sample / self.binning * self.binning
+            src_offset = binning_samples * bytes_per_sample
+            # copy new remainder to binning buffer
+            ctypes.memmove(self.binning_buffer, ctypes.byref(self.buffer, src_offset), remainder)
+            self.binning_offset = remainder
+
+            # there must be at least one binning sample
+            if binning_samples == 0:
+                return None, None
+            items = int(binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize)
+        else:
+            items = int(bytesread / np.dtype(np.int32).itemsize)
+
+        # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
+        x = np.fromstring(self.buffer, dtype=np.int32, count=items)
+        # shape and transpose to 1st axis is channel and 2nd axis is sample
+        samplesize = self.properties.CountEeg + self.properties.CountAux + 1 + 1
+        x.shape = (-1, samplesize)
+        y = x.transpose()
+
+        # extract the different channel types
+        index = 0
+        eeg = np.array(y[indices], np.floating)
+
+        # get indices of disconnected electrodes (all values == ADC_MAX)
+        # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
+        disconnected = None  # not possible yet
+
+        # extract and scale the different channel types
+        eegscale = self.properties.ResolutionEeg * 1e6  # convert to µV
+        eeg[index:eegcount] = eeg[index:eegcount] * eegscale
+        index += eegcount
+        auxscale = self.properties.ResolutionAux * 1e6  # convert to µV
+        eeg[index:index + auxcount] = eeg[index:index + auxcount] * auxscale
+
+        # extract trigger channel
+        index = self.properties.CountEeg + self.properties.CountAux
+        trg = np.array(y[index:index + 1], np.uint32)
+
+        # compensate constant trigger delay
+        if CHAMP_COMPTRIGGER:
+            dsize = len(trg[0])
+            temp = np.append(self.trgdelaybuf, trg[0], 0)
+            trg[0] = temp[:dsize]
+            self.trgdelaybuf = temp[dsize:]
+
+        # extract sample counter channel
+        index += 1
+        sctTemp = np.array(y[index:index + 1], np.uint32)
+
+        # search for sample counter wrap around and adjust counter
+        sct = np.array(sctTemp, np.uint64) + self.sampleCounterAdjust
+        wrap = np.nonzero(sctTemp == 0)
+        if (wrap[1].size > 0) and sct[0][0]:
+            wrapIndex = wrap[1][0]
+            adjust = np.iinfo(np.uint32).max + 1
+            self.sampleCounterAdjust += adjust
+            sct[:, wrapIndex:] += adjust
+
+        # Test Signal Generator
+        # use internal signal generator?
+        # if PYSIGGEN and self.EmulationMode:
+        #     if not len(self.DummySignals):
+        #         # create dummy signals at the first read
+        #         sg = SignalGenerator(np.float)
+        #         sr = sample_rate[self.settings.Rate]
+        #         numchannels = eegcount + auxcount
+        #         '''
+        #         t, self.DummySignals = sg.GetSineWaveBuffers(numchannels,
+        #                                                      5.0, sr/40/numchannels ,
+        #                                                      100.0, 10.0,
+        #                                                      sr)
+        #         '''
+        #         t, self.DummySignals = sg.GetSineWaveBuffers(numchannels,
+        #                                                      [1.0, 2.0, 3.7, 5.0, 10.0, 17.2, 20.0, 50.0, 100.0, 200.0],
+        #                                                      1.0,
+        #                                                      100.0, 0.0,
+        #                                                      sr)
+        #     # replace eeg with generated signals
+        #     sc32 = np.array(sct[0], dtype=np.int)
+        #     for c in range(len(eeg)):
+        #         eeg[c] = np.take(self.DummySignals[c], sc32, mode="wrap")
+        #
+        #     # write trigger every 10s
+        #     tr = sample_rate[self.settings.Rate] * 10
+        #     trIdx = np.nonzero((sc32 % tr) < 3)[0]
+        #     trg[0] = 0
+        #     if trIdx.size:
+        #         trg[0, trIdx] = 1
+
+        d = []
+        d.append(eeg)
+        d.append(trg)
+        d.append(sct)
+        return d, disconnected
+
+    def _get_settings_ex(self, settings):
+        ''' Prepare extended settings (rate, decimation and filter)
+        @param settings: amplifier base settings
+        @return: extended settings
+        '''
+        csext = CHAMP_SETTINGS_EX()
+        csext.Mode = settings.Mode
+        csext.Rate = sample_rate_settings[settings.Rate]
+        csext.Decimation = sample_rate_decimation[settings.Rate]
+        csext.AdcFilter = CHAMP_ADC_AVERAGING_2
+        return csext
+
+    def setPllInput(self):
+        """
+        Set the PLL input either to external or internal
+        """
+        if self.devicehandle == 0 or not self.hasPllOption() or self.getEmulationMode() != 0:
+            return
+
+        PllParamters = CHAMP_PLL()
+        PllParamters.PllExternal = self.PllExternal
+        PllParamters.AdcExternal = 0
+        PllParamters.PllFrequency = 25600000
+        PllParamters.PllPhase = 0
+
+        err = self.lib.champSetPll(self.devicehandle, ctypes.byref(PllParamters))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set PLL parameters\nPLL frequency: %d, Status: %d" % (
+                PllParamters.PllFrequency, PllParamters.Status), err)
+
+    def hasPllOption(self):
+        """
+        The PLL option is available for Rev. 3 amplifiers only and has to be enabled in the INI file
+        """
+        return self.enablePllConfiguration and (self.ampversion.revision() >= 3)
+
+    def getBatteryVoltage(self):
+        ''' Read the amplifier battery voltages
+        @return: state (0=ok, 1=critical, 2=bad) and voltage
+        '''
+        faultyVoltages = []
+        voltages = CHAMP_VOLTAGES()
+        # voltages.VDC = 0.0
+        if self.devicehandle == 0:
+            return 0, voltages, faultyVoltages
+
+        # get amplifier voltages
+        err = self.lib.champGetVoltages(self.devicehandle, ctypes.byref(voltages))
+        if err != CHAMP_ERR_OK:
+            time.sleep(0.005)
+            err = self.lib.champGetVoltages(self.devicehandle, ctypes.byref(voltages))
+            if err != CHAMP_ERR_OK:
+                if self.running:
+                    return 2, voltages, faultyVoltages
+                else:
+                    return 0, voltages, faultyVoltages
+
+        # check battery voltage
+        state = 0
+        if voltages.VDC < 5.6:
+            state = 1
+        if voltages.VDC < 5.3:
+            state = 2
+        # check other voltages
+        # 'V3' Internal 3.3, [V]
+        # 'DVDD3' Digital 3.3, [V]
+        # 'AVDD3' Analog 3.3, [V]
+        # 'AVDD5' Analog 5.0, [V]
+        # 'REF'   Reference 2.048, [V]
+        if self.running:
+            targets = [("V3", 3.3), ("DVDD3", 3.3), ("AVDD3", 3.3), ("AVDD5", 5.0), ("REF", 2.048)]
+            if self.deviceinfo[0].SerialNumber == 11020001:
+                targets = [("V3", 3.3), ("DVDD3", 2.2), ("AVDD3", 3.3), ("AVDD5", 5.0), ("REF", 2.048)]
+            for idx, target in targets:
+                u = getattr(voltages, idx)
+                if u < 0.9 * target or u > 1.1 * target:
+                    faultyVoltages.append("%s=%.1fV" % (idx, u))
+
+        return state, voltages, faultyVoltages
+
+
+if __name__ == "__main__":
+    obj = ActiChamp()
+
+    obj.open()
+
+    obj.setup(
+        mode=CHAMP_MODE_NORMAL,
+        rate=CHAMP_RATE_500HZ,
+        binning=1
+    )
+    print("*")
+    obj.start()
+
+    for i in range(5):
+        time.sleep(0.1)
+        # try:
+        d = obj.read(
+            indices=np.array([0, 1]),
+            eegcount=2,
+            auxcount=0
+        )
+        print(d)
+        # except Exception as err:
+        #     print(err)
+    obj.stop()
+    obj.close()
+
+
+
+
+
