@@ -55,7 +55,8 @@ ADC_MAX = 0x7FFFFF
 # CHAMP_VERSION = 0x120D0710          # 18.13.07.16 DLL
 # CHAMP_VERSION = 0x160D0B0E          # 22.13.11.14 DLL
 # CHAMP_VERSION = 0x170E040F           # 23.14.04.15 DLL
-CHAMP_VERSION = 0x190E0804  # 25.14.08.04 DLL
+# CHAMP_VERSION = 0x190E0804  # 25.14.08.04 DLL
+CHAMP_VERSION = 0x1D13060B  # 29.19.6.11
 
 # required firmware versions (board revision 4)
 CHAMP_4_VERSION_CTRL = 0x040B041C  # 04.11.04.28 FX2 USB controller
@@ -758,7 +759,6 @@ class ActiChamp:
             bytesread = self.lib.champGetDataBlocking(self.devicehandle,
                                                       ctypes.byref(self.buffer, self.binning_offset),
                                                       requestedbytes)
-
         blocktime = (time.process_time() - self.BlockTimer)
         self.BlockTimer = time.process_time()
 
@@ -794,12 +794,12 @@ class ActiChamp:
             # there must be at least one binning sample
             if binning_samples == 0:
                 return None, None
-            items = binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize
+            items = int(binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize)
         else:
-            items = bytesread / np.dtype(np.int32).itemsize
+            items = int(bytesread / np.dtype(np.int32).itemsize)
 
         # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
-        x = np.fromstring(self.buffer, np.int32, items)
+        x = np.fromstring(self.buffer, dtype=np.int32, count=items)
         # shape and transpose to 1st axis is channel and 2nd axis is sample
         samplesize = self.properties.CountEeg + self.properties.CountAux + 1 + 1
         x.shape = (-1, samplesize)
@@ -807,7 +807,7 @@ class ActiChamp:
 
         # extract the different channel types
         index = 0
-        eeg = np.array(y[indices], np.float)
+        eeg = np.array(y[indices], np.floating)
 
         # get indices of disconnected electrodes (all values == ADC_MAX)
         # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
@@ -917,6 +917,50 @@ class ActiChamp:
         """
         return self.enablePllConfiguration and (self.ampversion.revision() >= 3)
 
+    def getBatteryVoltage(self):
+        ''' Read the amplifier battery voltages
+        @return: state (0=ok, 1=critical, 2=bad) and voltage
+        '''
+        faultyVoltages = []
+        voltages = CHAMP_VOLTAGES()
+        # voltages.VDC = 0.0
+        if self.devicehandle == 0:
+            return 0, voltages, faultyVoltages
+
+        # get amplifier voltages
+        err = self.lib.champGetVoltages(self.devicehandle, ctypes.byref(voltages))
+        if err != CHAMP_ERR_OK:
+            time.sleep(0.005)
+            err = self.lib.champGetVoltages(self.devicehandle, ctypes.byref(voltages))
+            if err != CHAMP_ERR_OK:
+                if self.running:
+                    return 2, voltages, faultyVoltages
+                else:
+                    return 0, voltages, faultyVoltages
+
+        # check battery voltage
+        state = 0
+        if voltages.VDC < 5.6:
+            state = 1
+        if voltages.VDC < 5.3:
+            state = 2
+        # check other voltages
+        # 'V3' Internal 3.3, [V]
+        # 'DVDD3' Digital 3.3, [V]
+        # 'AVDD3' Analog 3.3, [V]
+        # 'AVDD5' Analog 5.0, [V]
+        # 'REF'   Reference 2.048, [V]
+        if self.running:
+            targets = [("V3", 3.3), ("DVDD3", 3.3), ("AVDD3", 3.3), ("AVDD5", 5.0), ("REF", 2.048)]
+            if self.deviceinfo[0].SerialNumber == 11020001:
+                targets = [("V3", 3.3), ("DVDD3", 2.2), ("AVDD3", 3.3), ("AVDD5", 5.0), ("REF", 2.048)]
+            for idx, target in targets:
+                u = getattr(voltages, idx)
+                if u < 0.9 * target or u > 1.1 * target:
+                    faultyVoltages.append("%s=%.1fV" % (idx, u))
+
+        return state, voltages, faultyVoltages
+
 
 if __name__ == "__main__":
     obj = ActiChamp()
@@ -931,16 +975,17 @@ if __name__ == "__main__":
     print("*")
     obj.start()
 
-
-    for i in range(100):
+    for i in range(5):
         time.sleep(0.1)
+        # try:
         d = obj.read(
             indices=np.array([0, 1]),
             eegcount=2,
             auxcount=0
         )
         print(d)
-
+        # except Exception as err:
+        #     print(err)
     obj.stop()
     obj.close()
 
