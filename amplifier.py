@@ -28,6 +28,8 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 @author: Norbert Hauser
 @version: 1.0
 '''
+from scipy import signal
+
 from modbase import *
 from actichamp_w import *
 
@@ -85,11 +87,12 @@ class AMP_ActiChamp(ModuleBase):
         self.binning = self.sample_rate['div']
         self.binningoffset = 0
 
-        # ToDo: set default data block
-        # if AMP_MONTAGE:
-        #     self._create_channel_selection()
-        # else:
-        #     self._create_all_channel_selection()
+        # set default data block
+        if AMP_MONTAGE:
+            # ToDo: self._create_channel_selection()
+            pass
+        else:
+            self._create_all_channel_selection()
 
         # ToDo: make the input device container
         # create the input device container
@@ -120,7 +123,180 @@ class AMP_ActiChamp(ModuleBase):
         self.acquisitionTimeoutCounter = 0
         self.test_counter = 0
 
+    # def _create_channel_selection(self):
+    #     ''' Create index arrays of selected channels and prepare EEG_DataBlock
+    #     '''
+    #     # get all active eeg channel indices (including reference channel)
+    #     mask = lambda x: (x.group == ChannelGroup.EEG) and (x.enable | x.isReference) and (
+    #             x.input <= self.amp.properties.CountEeg)
+    #     eeg_map = np.array(list(map(mask, self.channel_config)))
+    #     self.eeg_indices = np.nonzero(eeg_map)[0]  # indices of all eeg channels
+    #
+    #     # get all active aux channel indices
+    #     mask = lambda x: (x.group == ChannelGroup.AUX) and x.enable and (x.input <= self.amp.properties.CountAux)
+    #     eeg_map = np.array(list(map(mask, self.channel_config)))
+    #     self.aux_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
+    #     self.property_indices = np.append(self.eeg_indices, self.aux_indices)
+    #
+    #     # adjust AUX indices to the actual available EEG channels
+    #     self.aux_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg)
+    #     self.channel_indices = np.append(self.eeg_indices, self.aux_indices)
+    #
+    #     # create a new data block based on channel selection
+    #     self.eeg_data = EEG_DataBlock(len(self.eeg_indices), len(self.aux_indices))
+    #     self.eeg_data.channel_properties = copy.deepcopy(self.channel_config[self.property_indices])
+    #     self.eeg_data.sample_rate = self.sample_rate['value']
+    #
+    #     # get the reference channel indices
+    #     # mask = lambda x: (x.group == ChannelGroup.EEG) and x.isReference and (x.input <= self.amp.properties.CountEeg)
+    #     # ToDo: check type map(...)
+    #     eeg_ref = np.array(map(lambda x: x.isReference, self.eeg_data.channel_properties))
+    #     self.ref_index = np.nonzero(eeg_ref)[0]  # indices of reference channel(s)
+    #     if len(self.ref_index) and not AMP_MULTIPLE_REF:
+    #         # use only the first reference channel
+    #         self.ref_index = self.ref_index[0:1]
+    #         idx = np.nonzero(map(lambda x: x not in self.ref_index,
+    #                              range(0, len(self.eeg_indices))
+    #                              )
+    #                          )[0]
+    #         for prop in self.eeg_data.channel_properties[idx]:
+    #             prop.isReference = False
+    #
+    #     # append "REF" to the reference channel name and create the combined reference channel name
+    #     refnames = []
+    #     for prop in self.eeg_data.channel_properties[self.ref_index]:
+    #         refnames.append(str(prop.name))
+    #         prop.name = "REF_" + prop.name
+    #         prop.refname = "REF"
+    #         # global hide for all reference channels?
+    #         if AMP_HIDE_REF:
+    #             prop.enable = False
+    #     if len(refnames) > 1:
+    #         self.eeg_data.ref_channel_name = "AVG(" + "+".join(refnames) + ")"
+    #     else:
+    #         self.eeg_data.ref_channel_name = "".join(refnames)
+    #
+    #     # remove reference channel if not in impedance mode
+    #     self.ref_remove_index = self.ref_index
+    #     if (self.recording_mode != CHAMP_MODE_IMPEDANCE) and len(self.ref_index):
+    #         # set reference channel names for all other electrodes
+    #         idx = np.nonzero(map(lambda x: x not in self.ref_index,
+    #                              range(0, len(self.eeg_indices))
+    #                              )
+    #                          )[0]
+    #         for prop in self.eeg_data.channel_properties[idx]:
+    #             prop.refname = "REF"
+    #
+    #         '''
+    #         # remove single reference channel
+    #         if AMP_HIDE_REF or not self.eeg_data.channel_properties[self.ref_index[0]].enable:
+    #             self.eeg_data.channel_properties = np.delete(self.eeg_data.channel_properties, self.ref_index, 0)
+    #             self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_index, 0)
+    #         '''
+    #         # remove all disabled reference channels
+    #         ref_dis = np.array(map(lambda x: x.isReference and not x.enable,
+    #                                self.eeg_data.channel_properties))
+    #         self.ref_remove_index = np.nonzero(ref_dis)[0]  # indices of disabled reference channels
+    #         self.eeg_data.channel_properties = np.delete(self.eeg_data.channel_properties, self.ref_remove_index, 0)
+    #         self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
+    #
+    #     # prepare recording mode and anti aliasing filters
+    #     # self._prepare_mode_and_filters()
+
+    def _create_all_channel_selection(self):
+        ''' Create index arrays of all available channels and prepare EEG_DataBlock
+        '''
+        # get all eeg channel indices
+        mask = lambda x: (x.group == ChannelGroup.EEG) and (x.input <= self.amp.properties.CountEeg)
+        eeg_map = np.array(list(map(mask, self.channel_config)))
+        self.eeg_indices = np.nonzero(eeg_map)[0]  # indices of all eeg channels
+
+        # get all aux channel indices
+        mask = lambda x: (x.group == ChannelGroup.AUX) and (x.input <= self.amp.properties.CountAux)
+        eeg_map = np.array(list(map(mask, self.channel_config)))
+        self.aux_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
+        self.property_indices = np.append(self.eeg_indices, self.aux_indices)
+
+        # adjust AUX indices to the actual available EEG channels
+        self.aux_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg)
+        self.channel_indices = np.append(self.eeg_indices, self.aux_indices)
+
+        # create a new data block based on channel selection
+        self.eeg_data = EEG_DataBlock(len(self.eeg_indices), len(self.aux_indices))
+        self.eeg_data.channel_properties = copy.deepcopy(self.channel_config[self.property_indices])
+        self.eeg_data.sample_rate = self.sample_rate['value']
+
+        # reset the reference channel indices
+        self.ref_index = np.array([])  # indices of reference channel(s)
+        self.eeg_data.ref_channel_name = ""
+        self.ref_remove_index = self.ref_index
+
+        # prepare recording mode and anti aliasing filters
+        self._prepare_mode_and_filters()
+
+    def _prepare_mode_and_filters(self):
+        # translate recording modes
+        if (self.recording_mode == CHAMP_MODE_NORMAL) or (self.recording_mode == CHAMP_MODE_ACTIVE_SHIELD):
+            self.eeg_data.recording_mode = RecordingMode.NORMAL
+        elif self.recording_mode == CHAMP_MODE_IMPEDANCE:
+            self.eeg_data.recording_mode = RecordingMode.IMPEDANCE
+        elif self.recording_mode == CHAMP_MODE_TEST:
+            self.eeg_data.recording_mode = RecordingMode.TEST
+
+        # down sampling
+        self.binning = self.sample_rate['div']
+        self.binningoffset = 0
+
+        # design anti-aliasing filter for down sampling
+        # it's an Nth order lowpass Butterworth filter from scipy
+        # signal.filter_design.butter(N, Wn, btype='low')
+        # N = filter order, Wn = cut-off frequency / nyquist frequency
+        # f_nyquist = f_in / 2
+        # f_cutoff = f_in / rate_divider * filter_factor
+        # Wn = f_cutoff / f_nyquist = f_in / rate_divider * filter_factor / f_in * 2
+        # Wn = 1 / rate_divider * 2 * filter_factor
+        filter_order = 4
+        filter_factor = 0.333
+        rate_divider = self.binning
+        Wn = 1.0 / rate_divider * 2.0 * filter_factor
+        self.aliasing_b, self.aliasing_a = signal.butter(N=filter_order, Wn=Wn, btype='low')
+        zi = signal.lfiltic(self.aliasing_b, self.aliasing_a, (0.0,))
+        self.aliasing_zi = np.resize(zi, (len(self.channel_indices), len(zi)))
+
+        # define which channels contains which impedance values
+        self.eeg_data.eeg_channels[:, :] = 0
+        if self.eeg_data.recording_mode == RecordingMode.IMPEDANCE:
+            self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.DATA] = 1
+            self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.GND] = 1
+
+    def setDefault(self):
+        ''' Set all module parameters to default values
+        '''
+        emulation_mode = self.amp.getEmulationMode() > 0
+        self.sample_rate = self.sample_rates[7]     # 500Hz sample rate
+        for channel in self.channel_config:
+            channel.isReference = False
+            if channel.group == ChannelGroup.EEG:
+                channel.enable = True               # enable all EEG channels
+                if (channel.input == 1) and not emulation_mode:
+                    channel.isReference = True      # use first channel as reference
+            else:
+                channel.enable = False              # disable all AUX channels
+        self._set_default_filter()
+        # ToDo: self.inputDevices.reset()
+        self.update_receivers()
+
+    def _set_default_filter(self):
+        ''' set all filter properties to HW filter values
+        '''
+        for channel in self.channel_config:
+            channel.highpass = 0.0                  # high pass off
+            channel.lowpass = 0.0                   # low pass off
+            channel.notchfilter = False             # notch filter off
+
+
+
 
 if __name__ == "__main__":
     obj = AMP_ActiChamp()
-    print(vars(obj))
+    # print(vars(obj))
