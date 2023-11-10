@@ -294,6 +294,65 @@ class AMP_ActiChamp(ModuleBase):
             channel.lowpass = 0.0                   # low pass off
             channel.notchfilter = False             # notch filter off
 
+    def process_start(self):
+        ''' Open amplifier hardware and start data acquisition
+        '''
+        # reset variables
+        self.eeg_data.sample_counter = 0
+        self.acquisitionTimeoutCounter = 0
+        self.battery_timer = 0
+        self.test_counter = 0
+
+        # open and setup hardware
+        self.amp.open()
+
+        # check battery
+        ok, voltage = self._check_battery()
+        if not ok:
+            raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
+
+        self.amp.setup(self.recording_mode, self.sample_rate['base'], self.sample_rate['div'])
+        self.update_receivers()
+        if len(self.channel_indices) == 0:
+            raise ModuleError(self._object_name, "no input channels selected!")
+
+        # check battery again
+        ok, voltage = self._check_battery()
+        if not ok:
+            raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
+
+        # start hardware
+        self.amp.start()
+
+        # set start time on first call
+        self.start_time = datetime.datetime.now()
+
+        # send status info
+        if AMP_MONTAGE:
+            info = "Start %s at %.0fHz with %d channels" % (CHAMP_Modes[self.recording_mode], self.eeg_data.sample_rate,
+                                                            len(self.channel_indices))
+        else:
+            if self.amp.hasPllOption() and self.amp.PllExternal:
+                info = "Start %s at %.0fHz (ext. PLL)" % (CHAMP_Modes[self.recording_mode],
+                                                          self.eeg_data.sample_rate)
+            else:
+                info = "Start %s at %.0fHz" % (CHAMP_Modes[self.recording_mode],
+                                               self.eeg_data.sample_rate)
+
+        # ToDo: self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
+        # ToDo: send recording mode
+        # self.send_event(ModuleEvent(self._object_name,
+        #                             EventType.STATUS,
+        #                             info=self.recording_mode,
+        #                             status_field="Mode"))
+        # ToDo: update button state
+        # self.online_cfg.updateUI(self.recording_mode)
+
+        # skip the first received data blocks
+        self.skip_counter = 5
+        self.blocking_counter = 0
+        self.initialErrorCount = -1
+
 
 
 
