@@ -961,6 +961,25 @@ class ActiChamp:
 
         return state, voltages, faultyVoltages
 
+    @staticmethod
+    def getSamplingRateBase(samplingrate):
+        ''' Get base sampling rate ID and divider for the requested sampling rate
+        @param samplingrate: requested sampling rate in Hz
+        @return: base rate ID (-1 if not possible) and base rate divider
+        '''
+        mindiv = 100000
+        base = -1
+        div = 1
+        for sr in sample_rate:
+            div = sample_rate[sr] / samplingrate
+            if int(div) == div:
+                if div < mindiv:
+                    mindiv = div
+                    base = sr
+        if base >= 0:
+            div = int(sample_rate[base] / samplingrate)
+        return base, div
+
 
 if __name__ == "__main__":
     obj = ActiChamp()
