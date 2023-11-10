@@ -980,6 +980,53 @@ class ActiChamp:
             div = int(sample_rate[base] / samplingrate)
         return base, div
 
+    def LedTest(self, step):
+        ''' Toggle active electrode LEDs
+        @param step: 0 = switch off all electrode LEDs, reset index
+                     1 = set next electrode to green
+                     2 = set next electrode to red
+                     11 = set all electrodes to green
+                     12 = set all electrodes to red
+        @return: TRUE if last electrode index reached
+        '''
+        ledcount = self.properties.CountEeg + 1
+        led_array = (ctypes.c_int * ledcount)()
+        led_array[:] = [0] * len(led_array)
+        if step == 0:
+            self.LED_index = 0
+            self.lib.champSetElectrodes(self.devicehandle, None, 0)
+            return True
+        elif step == 1:
+            led_array[self.LED_index] = 1
+            self.LED_index += 1
+        elif step == 2:
+            led_array[self.LED_index] = 2
+            self.LED_index += 1
+        elif step == 11:
+            led_array[:] = [1]*len(led_array)
+            self.LED_index = 0
+        elif step == 12:
+            led_array[:] = [2]*len(led_array)
+            self.LED_index = 0
+        err = self.lib.champSetElectrodes(self.devicehandle, led_array, ctypes.sizeof(led_array))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set electrode LEDs", err)
+        if self.LED_index >= len(led_array):
+            self.LED_index = 0
+        return self.LED_index == 0
+
+    def getDeviceStatus(self):
+        ''' Read status values from device
+        @return: total samples, total errors, data rate and data speed as tuple
+        '''
+        if self.devicehandle == 0:
+            return 0, 0, 0, 0
+        status = CHAMP_DATA_STATUS()
+        err = self.lib.champGetDataStatus(self.devicehandle, ctypes.byref(status))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to read device status", err)
+        return status.Samples, status.Errors, status.Rate, status.Speed
+
 
 if __name__ == "__main__":
     obj = ActiChamp()

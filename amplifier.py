@@ -353,6 +353,78 @@ class AMP_ActiChamp(ModuleBase):
         self.blocking_counter = 0
         self.initialErrorCount = -1
 
+    def _check_battery(self):
+        ''' Check amplifier battery voltages
+        @return: state (ok=True, bad=False) and voltage
+        '''
+        # read battery state and internal voltages from amplifier
+        state, voltages, faultyVoltages = self.amp.getBatteryVoltage()
+        severe = ErrorSeverity.IGNORE
+        if state == 1:
+            severe = ErrorSeverity.NOTIFY
+        elif state == 2:
+            severe = ErrorSeverity.STOP
+
+        # create and send faulty voltages warning message
+        v_warning = ""
+        if len(faultyVoltages) > 0:
+            severe = ErrorSeverity.NOTIFY
+            v_warning = "Faulty internal voltage(s): "
+            for u in faultyVoltages:
+                v_warning += " %s" % u
+            # warning already sent?
+            if v_warning != self.voltage_warning:
+                # ToDo: self.send_event(ModuleEvent(self._object_name,
+                #                             EventType.ERROR,
+                #                             info=v_warning,
+                #                             severity=severe))
+                pass
+        self.voltage_warning = v_warning
+
+        # create and send status message
+        voltage_info = "%.2fV" % voltages.VDC  # battery voltage
+        for u in faultyVoltages:
+            voltage_info += "\n%s" % u
+        # ToDo: self.send_event(ModuleEvent(self._object_name,
+        #                             EventType.STATUS,
+        #                             info=voltage_info,
+        #                             severity=severe,
+        #                             status_field="Battery"))
+        return state < 2, voltages.VDC
+
+    def process_stop(self):
+        ''' Stop data acquisition and close hardware object
+        '''
+        errors = 999
+        try:
+            errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount  # get number of device errors
+        except:
+            pass
+        try:
+            if self.recording_mode == CHAMP_MODE_LED_TEST:
+                self.amp.LedTest(0)
+            self.amp.stop()
+        except:
+            pass
+        try:
+            self.amp.close()
+        except:
+            pass
+
+        # send status info
+        info = "Stop %s" % (CHAMP_Modes[self.recording_mode])
+        if (errors > 0) and (self.recording_mode != CHAMP_MODE_IMPEDANCE) and (
+                self.recording_mode != CHAMP_MODE_LED_TEST):
+            info += " (device errors = %d)" % errors
+        # ToDo: self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
+        # send recording mode
+        # ToDo: self.send_event(ModuleEvent(self._object_name,
+        #                             EventType.STATUS,
+        #                             info=-1,  # stop
+        #                             status_field="Mode"))
+        # update button state
+        # ToDo: self.online_cfg.updateUI(-1)
+
 
 
 
