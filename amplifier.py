@@ -28,6 +28,8 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 @author: Norbert Hauser
 @version: 1.0
 '''
+import time
+
 from scipy import signal
 
 from modbase import *
@@ -273,15 +275,15 @@ class AMP_ActiChamp(ModuleBase):
         ''' Set all module parameters to default values
         '''
         emulation_mode = self.amp.getEmulationMode() > 0
-        self.sample_rate = self.sample_rates[7]     # 500Hz sample rate
+        self.sample_rate = self.sample_rates[7]  # 500Hz sample rate
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
-                channel.enable = True               # enable all EEG channels
+                channel.enable = True  # enable all EEG channels
                 if (channel.input == 1) and not emulation_mode:
-                    channel.isReference = True      # use first channel as reference
+                    channel.isReference = True  # use first channel as reference
             else:
-                channel.enable = False              # disable all AUX channels
+                channel.enable = False  # disable all AUX channels
         self._set_default_filter()
         # ToDo: self.inputDevices.reset()
         self.update_receivers()
@@ -290,9 +292,9 @@ class AMP_ActiChamp(ModuleBase):
         ''' set all filter properties to HW filter values
         '''
         for channel in self.channel_config:
-            channel.highpass = 0.0                  # high pass off
-            channel.lowpass = 0.0                   # low pass off
-            channel.notchfilter = False             # notch filter off
+            channel.highpass = 0.0  # high pass off
+            channel.lowpass = 0.0  # low pass off
+            channel.notchfilter = False  # notch filter off
 
     def process_start(self):
         ''' Open amplifier hardware and start data acquisition
@@ -425,9 +427,154 @@ class AMP_ActiChamp(ModuleBase):
         # update button state
         # ToDo: self.online_cfg.updateUI(-1)
 
+    def process_output(self):
+        ''' Get data from amplifier
+        and return the eeg data block
+        '''
+        t = time.process_time()
+        self.eeg_data.performance_timer = 0
+        self.eeg_data.performance_timer_max = 0
+        self.recordtime = 0.0
+
+        # check battery voltage every 5s
+        if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
+            ok, voltage = self._check_battery()
+            if not ok:
+                raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
+            self.battery_timer = t
+
+        # ToDo: if self.recording_mode == CHAMP_MODE_IMPEDANCE:
+        #     return self.process_impedance()
+
+        # ToDo: if self.recording_mode == CHAMP_MODE_LED_TEST:
+        #     return self.process_led_test()
+
+        if self.amp.BlockingMode:
+            self._thLock.release()
+            try:
+                d, disconnected = self.amp.read(self.channel_indices,
+                                                len(self.eeg_indices), len(self.aux_indices))
+
+            finally:
+                self._thLock.acquire()
+            self.output_timer = time.process_time()
+        else:
+            d, disconnected = self.amp.read(self.channel_indices,
+                                            len(self.eeg_indices), len(self.aux_indices))
+
+        if d is None:
+            self.acquisitionTimeoutCounter += 1
+            # about 5s timeout
+            if self.acquisitionTimeoutCounter > 100:
+                self.acquisitionTimeoutCounter = 0
+                raise ModuleError(self._object_name, "connection to hardware is broken!")
+            # check data rate mismatch messages
+            if disconnected == CHAMP_ERR_MONITORING:
+                # ToDo: self.send_event(ModuleEvent(self._object_name,
+                #                             EventType.ERROR,
+                #                             info="USB data rate mismatch",
+                #                             severity=ErrorSeverity.NOTIFY))
+                pass
+            return None
+        else:
+            self.acquisitionTimeoutCounter = 0
+
+        # skip the first received data blocks
+        if self.skip_counter > 0:
+            self.skip_counter -= 1
+            return None
+        # get the initial error counter
+        if self.initialErrorCount < 0:
+            self.initialErrorCount = self.amp.getDeviceStatus()[1]
+
+        # down sample required?
+        if self.binning > 1:
+            # anti-aliasing filter
+            filtered, self.aliasing_zi = \
+                signal.lfilter(self.aliasing_b, self.aliasing_a, d[0], zi=self.aliasing_zi)
+            # reduce reslution to avoid limit cycle
+            # self.aliasing_zi = np.asfarray(self.aliasing_zi, np.float32)
+
+            self.eeg_data.eeg_channels = filtered[:, self.binningoffset::self.binning]
+            self.eeg_data.trigger_channel = np.bitwise_or.reduce(d[1][:].reshape(-1, self.binning), axis=1).reshape(1,
+                                                                                                                    -1)
+            self.eeg_data.sample_channel = d[2][:, self.binningoffset::self.binning] / self.binning
+            self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
+        else:
+            self.eeg_data.eeg_channels = d[0]
+            self.eeg_data.trigger_channel = d[1]
+            self.eeg_data.sample_channel = d[2]
+            self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
+
+        # average, subtract and remove the reference channels
+        if len(self.ref_index):
+            '''
+            # subtract
+            for ref_channel in self.eeg_data.eeg_channels[self.ref_index]:
+                self.eeg_data.eeg_channels[:len(self.eeg_indices)] -= ref_channel
+                # restore reference channel
+                self.eeg_data.eeg_channels[self.ref_index[0]] = ref_channel
+
+            # remove single reference channel if not enabled
+            if not (len(self.eeg_data.channel_properties) > self.ref_index[0] and
+                    self.eeg_data.channel_properties[self.ref_index[0]].isReference ):
+                self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_index, 0)
+            '''
+            # average reference channels
+            reference = np.mean(self.eeg_data.eeg_channels[self.ref_index], 0)
+
+            # subtract reference
+            self.eeg_data.eeg_channels[:len(self.eeg_indices)] -= reference
+
+            # remove all disabled reference channels
+            if len(self.ref_remove_index) > 0:
+                self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
+
+        # calculate date and time for the first sample of this block in s
+        sampletime = self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate
+        self.eeg_data.block_time = self.start_time + datetime.timedelta(seconds=sampletime)
+
+        # ToDo: process connected input devices
+        # if not AMP_MONTAGE:
+        #     self.inputDevices.process_input(self.eeg_data)
+
+        # put it into the receiver queues
+        eeg = copy.copy(self.eeg_data)
+
+        self.recordtime = time.process_time() - t
+
+        return eeg
+
+
+class Receiver(ModuleBase):
+    def __init__(self):
+        super(ModuleBase).__init__()
 
 
 
 if __name__ == "__main__":
-    obj = AMP_ActiChamp()
-    # print(vars(obj))
+    amp = AMP_ActiChamp()
+    # amp.amp.BlockingMode = False
+    amp.setDefault()
+    amp.process_start()
+
+    for i in range(10):
+        time.sleep(1)
+        print(amp.amp.read(
+            indices=np.array([0, 1]),
+            eegcount=2,
+            auxcount=0
+        ))
+
+    amp.stop()
+
+    # amp.setDefault()
+    # amp.process_start()
+    #
+    # for i in range(4):
+    #     time.sleep(1)
+    #     print(amp.process_output())
+    #
+    # amp.process_stop()
+    # amp.start()
+
