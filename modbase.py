@@ -45,6 +45,7 @@ from lxml import etree
 from lxml import objectify
 
 from PyQt6.QtCore import Qt, QObject
+from PyQt6 import QtCore
 
 # impedance value invalid (electrode disconnected)
 # CHAMP_IMP_INVALID = 2147483647  # INT_MAX
@@ -178,7 +179,7 @@ class EEG_ChannelProperties:
         self.highpass = 0.0  #: high pass cutoff frequency in Hz
         self.notchfilter = False  #: enable / disable notch filter
         self.isReference = False  #: use this channel as reference channel
-        self.color = Qt.ColorScheme.darkBlue  #: display color
+        self.color = Qt.GlobalColor.darkBlue  #: display color
         self.unit = ""  #: channel unit string (use uV if empty)
 
     def __lt__(self, other):
@@ -349,10 +350,13 @@ class ModuleBase(QObject):
         @param name: module object identifier
         @param instance: instance number for this object
         '''
-        QObject.__init__(self)
+        # QObject.__init__(self)
+        super().__init__()
+
         # set identifier and instance
         self._object_name = name
         self._instance = instance
+
         # reset the receiver collection
         self._receivers = []
 
@@ -383,15 +387,18 @@ class ModuleBase(QObject):
         # flush input queue
         while not self._input_queue.empty():
             self._input_queue.get_nowait()
+
         # let derived class objects handle the start command
         try:
             self.process_start()
         except Exception as e:
             self.send_exception(e, ErrorSeverity.STOP)
             return
+
         # propagate start command to all attached receivers
         for receiver in self._receivers:
             receiver.start()
+
         # start the data transfer worker thread
         if self._usethread:
             if not self._running:
@@ -630,9 +637,9 @@ class ModuleBase(QObject):
             self._thLock.acquire()
             try:
                 data = self._input_queue.get(False)
-                t = time.clock()
+                t = time.process_time()
                 self.process_input(data)
-                wt += time.clock() - t
+                wt += time.process_time() - t
                 self._thLock.release()
             except queue.Empty:
                 self._thLock.release()
@@ -643,9 +650,9 @@ class ModuleBase(QObject):
             # put data to all registered output queues
             self._thLock.acquire()
             try:
-                self.output_timer = time.clock()
+                self.output_timer = time.process_time()
                 data = self.process_output()
-                wt += time.clock() - self.output_timer
+                wt += time.process_time() - self.output_timer
                 self._thLock.release()
             except Exception as e:
                 self._thLock.release()
@@ -695,3 +702,13 @@ class ModuleBase(QObject):
         '''
         return
 
+
+if __name__ == "__main__":
+    obj = ModuleBase(
+        usethread=True,
+        queuesize=1,
+        name="Example",
+        instance=1
+    )
+
+    print(obj)
