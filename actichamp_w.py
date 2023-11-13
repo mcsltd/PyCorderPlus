@@ -807,7 +807,7 @@ class ActiChamp:
 
         # extract the different channel types
         index = 0
-        eeg = np.array(y[indices], np.floating)
+        eeg = np.array(y[indices], np.cfloat)
 
         # get indices of disconnected electrodes (all values == ADC_MAX)
         # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
@@ -960,6 +960,72 @@ class ActiChamp:
                     faultyVoltages.append("%s=%.1fV" % (idx, u))
 
         return state, voltages, faultyVoltages
+
+    @staticmethod
+    def getSamplingRateBase(samplingrate):
+        ''' Get base sampling rate ID and divider for the requested sampling rate
+        @param samplingrate: requested sampling rate in Hz
+        @return: base rate ID (-1 if not possible) and base rate divider
+        '''
+        mindiv = 100000
+        base = -1
+        div = 1
+        for sr in sample_rate:
+            div = sample_rate[sr] / samplingrate
+            if int(div) == div:
+                if div < mindiv:
+                    mindiv = div
+                    base = sr
+        if base >= 0:
+            div = int(sample_rate[base] / samplingrate)
+        return base, div
+
+    def LedTest(self, step):
+        ''' Toggle active electrode LEDs
+        @param step: 0 = switch off all electrode LEDs, reset index
+                     1 = set next electrode to green
+                     2 = set next electrode to red
+                     11 = set all electrodes to green
+                     12 = set all electrodes to red
+        @return: TRUE if last electrode index reached
+        '''
+        ledcount = self.properties.CountEeg + 1
+        led_array = (ctypes.c_int * ledcount)()
+        led_array[:] = [0] * len(led_array)
+        if step == 0:
+            self.LED_index = 0
+            self.lib.champSetElectrodes(self.devicehandle, None, 0)
+            return True
+        elif step == 1:
+            led_array[self.LED_index] = 1
+            self.LED_index += 1
+        elif step == 2:
+            led_array[self.LED_index] = 2
+            self.LED_index += 1
+        elif step == 11:
+            led_array[:] = [1]*len(led_array)
+            self.LED_index = 0
+        elif step == 12:
+            led_array[:] = [2]*len(led_array)
+            self.LED_index = 0
+        err = self.lib.champSetElectrodes(self.devicehandle, led_array, ctypes.sizeof(led_array))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set electrode LEDs", err)
+        if self.LED_index >= len(led_array):
+            self.LED_index = 0
+        return self.LED_index == 0
+
+    def getDeviceStatus(self):
+        ''' Read status values from device
+        @return: total samples, total errors, data rate and data speed as tuple
+        '''
+        if self.devicehandle == 0:
+            return 0, 0, 0, 0
+        status = CHAMP_DATA_STATUS()
+        err = self.lib.champGetDataStatus(self.devicehandle, ctypes.byref(status))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to read device status", err)
+        return status.Samples, status.Errors, status.Rate, status.Speed
 
 
 if __name__ == "__main__":
