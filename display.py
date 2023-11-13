@@ -35,10 +35,11 @@ B{Revision:} $LastChangedRevision: 197 $
 import qwt as Qwt
 
 from modbase import *
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QSize, Qt, QRect, QPoint
+from PyQt6.QtWidgets import QApplication, QFrame
+from PyQt6.QtGui import QBrush, QPen, QFont
 
-from qtpy.QtGui import QBrush
+
 
 
 class DISP_Scope(Qwt.QwtPlot, ModuleBase):
@@ -77,41 +78,41 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         # self.connect(self.online_cfg.checkBoxBaseline, Qt.SIGNAL("stateChanged()"),
         #              self.baselineNowClicked)
 
-        # Todo add: legend
-        # legend = _ScopeLegend()
-        # legend.setFrameStyle(Qt.QFrame.Box | Qt.QFrame.Sunken)
-        # legend.setItemMode(Qwt.QwtLegend.ClickableItem)
-        # self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
+        # legend
+        legend = _ScopeLegend()
+        legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        legend.setDefaultItemMode(Qwt.QwtLegend.itemClicked)
+        self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
         # self.connect(self, Qt.SIGNAL("legendClicked(QwtPlotItem*)"),
         #              self.channelItemClicked)
 
         # grid
-        # self.grid = Qwt.QwtPlotGrid()
-        # self.grid.enableY(False)
-        # self.grid.enableX(True)
-        # self.grid.enableXMin(True)
-        # self.grid.setMajPen(Qt.QPen(Qt.Qt.gray, 0, Qt.Qt.SolidLine))
-        # self.grid.setMinPen(Qt.QPen(Qt.Qt.gray, 0, Qt.Qt.DashLine))
-        # self.grid.attach(self)
+        self.grid = Qwt.QwtPlotGrid()
+        self.grid.enableY(False)
+        self.grid.enableX(True)
+        self.grid.enableXMin(True)
+        self.grid.setMajorPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.SolidLine))
+        self.grid.setMinorPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.DashLine))
+        self.grid.attach(self)
 
-        # ToDo add: X axes
-        # font = Qt.QFont("arial", 9)
-        # title = Qwt.QwtText('Time [s]')
-        # title.setFont(font)
-        # self.setAxisTitle(Qwt.QwtPlot.xBottom, title)
-        # self.setAxisMaxMajor(Qwt.QwtPlot.xBottom, 5)
-        # self.setAxisMaxMinor(Qwt.QwtPlot.xBottom, 10)
-        # self.setAxisFont(Qwt.QwtPlot.xBottom, font)
-        # self.TimeScale = _TimeScaleDraw()
-        # self.setAxisScaleDraw(Qwt.QwtPlot.xBottom, self.TimeScale)
+        # X axes
+        font = QFont("arial", 9)
+        title = Qwt.QwtText('Time [s]')
+        title.setFont(font)
+        self.setAxisTitle(Qwt.QwtPlot.xBottom, title)
+        self.setAxisMaxMajor(Qwt.QwtPlot.xBottom, 5)
+        self.setAxisMaxMinor(Qwt.QwtPlot.xBottom, 10)
+        self.setAxisFont(Qwt.QwtPlot.xBottom, font)
+        self.TimeScale = _TimeScaleDraw()
+        self.setAxisScaleDraw(Qwt.QwtPlot.xBottom, self.TimeScale)
 
-        # ToDo add: Y axis
-        # self.setAxisTitle(Qwt.QwtPlot.yLeft, 'Amplitude');
-        # self.setAxisMaxMajor(Qwt.QwtPlot.yLeft, 0);
-        # self.setAxisMaxMinor(Qwt.QwtPlot.yLeft, 0);
-        # self.enableAxis(Qwt.QwtPlot.yLeft, False)
+        # Y axis
+        self.setAxisTitle(Qwt.QwtPlot.yLeft, 'Amplitude')
+        self.setAxisMaxMajor(Qwt.QwtPlot.yLeft, 0)
+        self.setAxisMaxMinor(Qwt.QwtPlot.yLeft, 0)
+        self.enableAxis(Qwt.QwtPlot.yLeft, False)
 
-        # self.plotscale = Qwt.QwtPlotScaleItem(Qwt.QwtScaleDraw.RightScale)
+        # self.plotscale = Qwt.QwtPlotSeriesItem(Qwt.QwtScaleDraw.RightScale)
         # self.plotscale.setBorderDistance(5)
         # self.plotscale.attach(self)
 
@@ -154,6 +155,68 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         Get the signal display pane
         """
         return self
+
+
+class _ScopeLegend(Qwt.QwtLegend):
+    """ QwtPlot custom legend widget.
+        Only necessary to make legend size same as canvas and to distribute
+        labels at curve positions
+        """
+    def __init__(self, *args):
+        super().__init__()
+        layout = self.contentsWidget().layout()
+        layout.setSpacing(0)
+
+    def heightForWidth(self, width):
+        return 0
+
+    def sizeHint(self):
+        sz = Qwt.QwtLegend.sizeHint(self)
+        width = sz.width() + Qwt.QwtLegend.verticalScrollBar(self).sizeHint().width()
+        sz.setHeight(200)
+        sz.setWidth(width)
+        return sz
+
+    def layoutContents(self):
+        topMargin = self.parent().plotLayout().canvasMargin(Qwt.QwtPlot.xTop)
+        bottomMargin = self.parent().plotLayout().canvasMargin(Qwt.QwtPlot.xBottom)
+        viewport = self.contentsWidget().parentWidget()
+        visibleSize = viewport.size()
+        items = self.legendItems()
+        itemspace = float(visibleSize.height() - (topMargin + bottomMargin)) / (self.itemCount() + 1)
+        offset = itemspace * 0.8 - itemspace * 0.5 + topMargin
+        yBottom = 0
+        for idx, item in enumerate(items):
+            yTop = (idx + 1) * itemspace
+            itemHeight = int(yTop - yBottom)
+            item.setFixedHeight(itemHeight)
+            yBottom += itemHeight
+        layout = self.contentsWidget().layout()
+        layout.setGeometry(QRect(QPoint(0, offset),
+                                 QPoint(visibleSize.width(), visibleSize.height() - 2 * offset)))
+        self.contentsWidget().resize(visibleSize.width(), visibleSize.height())
+        return
+
+
+class _TimeScaleDraw(Qwt.QwtScaleDraw):
+    """
+    Draw custom time values for x-axis
+    """
+
+    def __init__(self, *args):
+        super().__init__()
+        self._offset = 0.0
+
+    def label(self, value):
+        ret = Qwt.QwtText()
+        v = value
+        s = "%.2f" % v
+        ret.setText(s)
+        return ret
+
+    def setOffset(self, offset):
+        self._offset = offset
+        Qwt.QwtScaleDraw.invalidateCache(self)
 
 
 if __name__ == "__main__":
