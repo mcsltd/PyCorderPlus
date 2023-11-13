@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>play_green.png</file>
+    <file>record_grey.png</file>
+    <file>PyCorderPlus.ico</file>
+    <file>stop_green.png</file>
+    <file>process.png</file>
+    <file>play.png</file>
+    <file>record.png</file>
+    <file>stop.png</file>
+  </qresource>
+</RCC>
