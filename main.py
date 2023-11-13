@@ -10,6 +10,7 @@ from res import frmMain
 Import and instantiate recording modules.
 """
 from amplifier import AMP_ActiChamp, Receiver
+from display import DISP_Scope
 
 
 def InstantiateModules():
@@ -22,7 +23,8 @@ def InstantiateModules():
     # test modules for control amplifier
     modules = [
         AMP_ActiChamp(),
-        Receiver()
+        DISP_Scope(),
+        # Receiver()
     ]
     return modules
 
@@ -53,6 +55,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get the bottom module
         self.bottommodule = self.modules[-1]
+
+        # get signal panes for plot area
+        self.horizontalLayout_SignalPane.removeItem(self.horizontalLayout_SignalPane.itemAt(0))
+        for module in flatten(self.modules):
+            pane = module.get_display_pane()
+            if pane is not None:
+                self.horizontalLayout_SignalPane.addWidget(pane)
 
         # initial module chain update (top module)
         self.topmodule.update_receivers()
