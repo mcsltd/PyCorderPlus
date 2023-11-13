@@ -547,26 +547,52 @@ class AMP_ActiChamp(ModuleBase):
 
 
 class Receiver(ModuleBase):
-    def __init__(self):
-        super(ModuleBase).__init__()
+    def __init__(self, **kwargs):
+        super().__init__(usethread=False, queuesize=20, name="Receiver", instance=0)
 
+    def get_data(self):
+
+        if not self._input_queue.empty():
+            return self._input_queue.get()
+        else:
+            return None
+
+
+def example():
+    obj_1 = AMP_ActiChamp()
+    obj_2 = Receiver()
+
+    obj_1.add_receiver(obj_2)
+
+    obj_1.start()
+
+    d = obj_2.get_data()
+    while d is None:
+        d = obj_2.get_data()
+        print(d)
+
+    obj_1.stop()
+    obj_1.amp.close()
 
 
 if __name__ == "__main__":
-    amp = AMP_ActiChamp()
-    # amp.amp.BlockingMode = False
-    amp.setDefault()
-    amp.process_start()
 
-    for i in range(10):
-        time.sleep(1)
-        print(amp.amp.read(
-            indices=np.array([0, 1]),
-            eegcount=2,
-            auxcount=0
-        ))
+    example()
 
-    amp.stop()
+    # amp = AMP_ActiChamp()
+    # # amp.amp.BlockingMode = False
+    # amp.setDefault()
+    # amp.process_start()
+    #
+    # for i in range(10):
+    #     time.sleep(1)
+    #     print(amp.amp.read(
+    #         indices=np.array([0, 1]),
+    #         eegcount=2,
+    #         auxcount=0
+    #     ))
+    #
+    # amp.stop()
 
     # amp.setDefault()
     # amp.process_start()

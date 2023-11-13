@@ -807,7 +807,7 @@ class ActiChamp:
 
         # extract the different channel types
         index = 0
-        eeg = np.array(y[indices], np.floating)
+        eeg = np.array(y[indices], np.cfloat)
 
         # get indices of disconnected electrodes (all values == ADC_MAX)
         # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
