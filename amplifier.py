@@ -31,9 +31,14 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 import time
 
 from scipy import signal
+from PyQt6.QtWidgets import QFrame, QApplication
+from PyQt6.QtCore import pyqtSignal
+
 
 from modbase import *
 from actichamp_w import *
+
+from res import frmActiChampOnline
 
 # enable active shielding mode
 AMP_SHIELD_MODE = False
@@ -104,10 +109,11 @@ class AMP_ActiChamp(ModuleBase):
         self.start_time = datetime.datetime.now()
 
         # ToDo: create online configuration pane
-        # self.online_cfg = _OnlineCfgPane(self)
+        self.online_cfg = _OnlineCfgPane(self)
 
         # ToDo: rewrite this signal
         # self.connect(self.online_cfg, Qt.SIGNAL("modeChanged(int)"), self._online_mode_changed)
+        self.online_cfg.modeChanged.connect(self._online_mode_changed)
 
         # impedance interval timer
         self.impedance_timer = time.process_time()
@@ -124,6 +130,26 @@ class AMP_ActiChamp(ModuleBase):
         self.initialErrorCount = -1
         self.acquisitionTimeoutCounter = 0
         self.test_counter = 0
+
+    def get_online_configuration(self):
+        """
+        Get the online configuration pane
+        """
+        return self.online_cfg
+
+    def _online_mode_changed(self, new_mode):
+        """ SIGNAL from online configuration pane if recording mode has changed
+        """
+        if self.amp.running:
+            if not self.stop():
+                self.online_cfg.updateUI(self.recording_mode)
+                return
+
+        if new_mode >= 0:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            self.recording_mode = new_mode
+            self.start()
+            QApplication.restoreOverrideCursor()
 
     # def _create_channel_selection(self):
     #     ''' Create index arrays of selected channels and prepare EEG_DataBlock
@@ -233,7 +259,7 @@ class AMP_ActiChamp(ModuleBase):
         self.eeg_data.ref_channel_name = ""
         self.ref_remove_index = self.ref_index
 
-        # prepare recording mode and anti aliasing filters
+        # prepare recording mode and antialiasing filters
         self._prepare_mode_and_filters()
 
     def _prepare_mode_and_filters(self):
@@ -546,6 +572,71 @@ class AMP_ActiChamp(ModuleBase):
         return eeg
 
 
+"""
+Amplifier module online GUI.
+"""
+
+class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
+    ''' ActiChamp online configuration pane
+    '''
+    modeChanged = pyqtSignal(int)
+
+    def __init__(self, amp, *args):
+        ''' Constructor
+        @param amp: parent module object
+        '''
+        super().__init__()
+        self.setupUi(self)
+        self.amp = amp
+
+        # set default values
+        self.pushButtonStop.setChecked(True)
+
+        # re-assign the shielding button
+        if not AMP_SHIELD_MODE:
+            self.pushButtonStartShielding.setText("Electrode LED\nTest")
+
+        # actions
+        self.pushButtonStartDefault.clicked.connect(self._button_toggle)
+        self.pushButtonStartImpedance.clicked.connect(self._button_toggle)
+        self.pushButtonStartShielding.clicked.connect(self._button_toggle)
+        self.pushButtonStartTest.clicked.connect(self._button_toggle)
+        self.pushButtonStop.clicked.connect(self._button_toggle)
+
+    def _button_toggle(self, checked):
+        ''' SIGNAL if one of the push buttons is clicked
+        '''
+        if checked:
+            mode = -1  # stop
+            if self.pushButtonStartDefault.isChecked():
+                mode = CHAMP_MODE_NORMAL
+            elif self.pushButtonStartShielding.isChecked():
+                if AMP_SHIELD_MODE:
+                    mode = CHAMP_MODE_ACTIVE_SHIELD
+                else:
+                    mode = CHAMP_MODE_LED_TEST
+            elif self.pushButtonStartImpedance.isChecked():
+                mode = CHAMP_MODE_IMPEDANCE
+            elif self.pushButtonStartTest.isChecked():
+                mode = CHAMP_MODE_TEST
+            # self.emit(Qt.SIGNAL('modeChanged(int)'), mode)
+            self.modeChanged.emit(mode)
+
+    def updateUI(self, mode):
+        ''' Update user interface according to recording mode
+        '''
+        if mode == CHAMP_MODE_NORMAL:
+            self.pushButtonStartDefault.setChecked(True)
+        elif mode == CHAMP_MODE_ACTIVE_SHIELD or mode == CHAMP_MODE_LED_TEST:
+            self.pushButtonStartShielding.setChecked(True)
+        elif mode == CHAMP_MODE_IMPEDANCE:
+            self.pushButtonStartImpedance.setChecked(True)
+        elif mode == CHAMP_MODE_TEST:
+            self.pushButtonStartTest.setChecked(True)
+        else:
+            self.pushButtonStop.setChecked(True)
+
+
 class Receiver(ModuleBase):
     def __init__(self, **kwargs):
         super().__init__(usethread=False, queuesize=20, name="Receiver", instance=0)
@@ -576,7 +667,6 @@ def example():
 
 
 if __name__ == "__main__":
-
     example()
 
     # amp = AMP_ActiChamp()
@@ -603,4 +693,3 @@ if __name__ == "__main__":
     #
     # amp.process_stop()
     # amp.start()
-
