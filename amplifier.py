@@ -34,7 +34,6 @@ from scipy import signal
 from PyQt6.QtWidgets import QFrame, QApplication
 from PyQt6.QtCore import pyqtSignal
 
-
 from modbase import *
 from actichamp_w import *
 
@@ -373,8 +372,8 @@ class AMP_ActiChamp(ModuleBase):
         #                             EventType.STATUS,
         #                             info=self.recording_mode,
         #                             status_field="Mode"))
-        # ToDo: update button state
-        # self.online_cfg.updateUI(self.recording_mode)
+        # update button state
+        self.online_cfg.updateUI(self.recording_mode)
 
         # skip the first received data blocks
         self.skip_counter = 5
@@ -451,7 +450,7 @@ class AMP_ActiChamp(ModuleBase):
         #                             info=-1,  # stop
         #                             status_field="Mode"))
         # update button state
-        # ToDo: self.online_cfg.updateUI(-1)
+        self.online_cfg.updateUI(-1)
 
     def process_output(self):
         ''' Get data from amplifier
@@ -576,6 +575,7 @@ class AMP_ActiChamp(ModuleBase):
 Amplifier module online GUI.
 """
 
+
 class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
     ''' ActiChamp online configuration pane
     '''
@@ -619,7 +619,6 @@ class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
                 mode = CHAMP_MODE_IMPEDANCE
             elif self.pushButtonStartTest.isChecked():
                 mode = CHAMP_MODE_TEST
-            # self.emit(Qt.SIGNAL('modeChanged(int)'), mode)
             self.modeChanged.emit(mode)
 
     def updateUI(self, mode):
@@ -644,6 +643,7 @@ class Receiver(ModuleBase):
     def get_data(self):
 
         if not self._input_queue.empty():
+            print(self._input_queue.get())
             return self._input_queue.get()
         else:
             return None

@@ -101,7 +101,6 @@ def main(args):
 
     # win.showMaximized()
     win.show()
-
     app.exec()
 
 
