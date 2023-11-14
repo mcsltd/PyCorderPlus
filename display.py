@@ -74,22 +74,19 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
 
         # ToDo: create online configuration pane
         self.online_cfg = _OnlineCfgPane()
-        # self.connect(self.online_cfg.comboBoxTime, Qt.SIGNAL("activated(QString)"),
-        #              self.timebaseChanged)
-        # self.connect(self.online_cfg.comboBoxScale, Qt.SIGNAL("currentIndexChanged(QString)"),
-        #              self.scaleChanged)
-        # self.connect(self.online_cfg.comboBoxChannels, Qt.SIGNAL("currentIndexChanged(int)"),
-        #              self.channelsChanged)
-        # self.connect(self.online_cfg.pushButton_Now, Qt.SIGNAL("clicked()"),
-        #              self.baselineNowClicked)
-        # self.connect(self.online_cfg.checkBoxBaseline, Qt.SIGNAL("stateChanged()"),
-        #              self.baselineNowClicked)
+        self.online_cfg.comboBoxTime.activated.connect(self.timebaseChanged)
+        self.online_cfg.comboBoxScale.currentIndexChanged.connect(self.scaleChanged)
+        self.online_cfg.comboBoxChannels.currentIndexChanged.connect(self.channelsChanged)
+        self.online_cfg.pushButton_Now.clicked.connect(self.baselineNowClicked)
+        self.online_cfg.checkBoxBaseline.stateChanged.connect(self.baselineNowClicked)
+
 
         # legend
         legend = _ScopeLegend()
         legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
         legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
         self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
+        # ToDo: self.legendDataChanged.connect(self.channelItemClicked)
         # self.connect(self, Qt.SIGNAL("legendClicked(QwtPlotItem*)"),
         #              self.channelItemClicked)
 
@@ -495,64 +492,68 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
 
     # actions from online configuration pane
 
-    # def timebaseChanged(self, value):
-    #     ''' SIGNAL New timebase value selected
-    #     '''
-    #     # acquire thread lock
-    #     self._thLock.acquire()
-    #     # change timebase
-    #     # self.setTimebase(self.online_cfg.get_timebase())
-    #     # release thread lock
-    #     self._thLock.release()
-    #     self.onlineCfgChanged()
+    def timebaseChanged(self, value):
+        """
+        SIGNAL New timebase value selected
+        """
+        # acquire thread lock
+        self._thLock.acquire()
+        # change timebase
+        self.setTimebase(self.online_cfg.get_timebase())
+        # release thread lock
+        self._thLock.release()
+        self.onlineCfgChanged()
 
-    # def scaleChanged(self, value):
-    #     ''' SIGNAL New scale value selected
-    #     '''
-    #     # acquire thread lock
-    #     self._thLock.acquire()
-    #     # change scale
-    #     self.setScale(self.online_cfg.get_scale())
-    #     # release thread lock
-    #     self._thLock.release()
-    #     self.onlineCfgChanged()
+    def scaleChanged(self, value):
+        """
+        SIGNAL New scale value selected
+        """
+        # acquire thread lock
+        self._thLock.acquire()
+        # change scale
+        self.setScale(self.online_cfg.get_scale())
+        # release thread lock
+        self._thLock.release()
+        self.onlineCfgChanged()
 
-    # def channelsChanged(self, idx):
-    #     ''' SIGNAL Display channel configuration changed
-    #     '''
-    #     # acquire thread lock
-    #     self._thLock.acquire()
-    #     # change display channel configuration
-    #     if idx >= 0:
-    #         self.channel_slice = self.online_cfg.comboBoxChannels.itemData(idx).toPyObject()
-    #         self.arrangeTraces()
-    #     else:
-    #         self.channel_slice = slice(0, 0, 1)
-    #         # release thread lock
-    #     self._thLock.release()
+    def channelsChanged(self, idx):
+        """ SIGNAL Display channel configuration changed
+        """
+        # acquire thread lock
+        self._thLock.acquire()
+        # change display channel configuration
+        if idx >= 0:
+            self.channel_slice = self.online_cfg.comboBoxChannels.itemData(idx)
+            self.arrangeTraces()
+        else:
+            self.channel_slice = slice(0, 0, 1)
+            # release thread lock
+        self._thLock.release()
 
-    # def baselineNowClicked(self):
-    #     ''' SIGNAL Baseline correction now
-    #     '''
-    #     # acquire thread lock
-    #     self._thLock.acquire()
-    #     # use channel values at current write pointer position as new baselines
-    #     self.baselines = self.buffer[:, self.writePointer].reshape(-1, 1)
-    #     # release thread lock
-    #     self._thLock.release()
-    #     self.onlineCfgChanged()
+    def baselineNowClicked(self):
+        """
+        SIGNAL Baseline correction now
+        """
+        # acquire thread lock
+        self._thLock.acquire()
+        # use channel values at current write pointer position as new baselines
+        self.baselines = self.buffer[:, self.writePointer].reshape(-1, 1)
+        # release thread lock
+        self._thLock.release()
+        self.onlineCfgChanged()
 
-    # def channelItemClicked(self, plotitem):
-    #     ''' SIGNAL Channel legend clicked
-    #     '''
-    #     if self.selectedChannel == plotitem.title().text():
-    #         self.selectedChannel = None
-    #     else:
-    #         self.selectedChannel = plotitem.title().text()
-    #     self.send_event(ModuleEvent(self._object_name,
-    #                                 EventType.COMMAND,
-    #                                 info="ChannelSelected",
-    #                                 cmd_value=plotitem.title().text()))
+    def channelItemClicked(self, plotitem):
+        """
+        SIGNAL Channel legend clicked
+        """
+        if self.selectedChannel == plotitem.title().text():
+            self.selectedChannel = None
+        else:
+            self.selectedChannel = plotitem.title().text()
+        # self.send_event(ModuleEvent(self._object_name,
+        #                             EventType.COMMAND,
+        #                             info="ChannelSelected",
+        #                             cmd_value=plotitem.title().text()))
 
 
 class _ScopeLegend(Qwt.QwtLegend):
@@ -670,10 +671,17 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
 
         # actions
         self.comboBoxGroupSize.currentIndexChanged.connect(self._groupsChanged)
-        self.comboBoxChannels.setCurrentIndex.connect(self._channelsChanged)
+        self.comboBoxChannels.currentIndexChanged.connect(self._channelsChanged)
         self.checkBoxBaseline.toggled.connect(self._baselineToggled)
         self.comboBoxScale.currentIndexChanged.connect(self._scaleChanged)
 
+    def get_timebase(self):
+        """
+        Get current selected timebase value from combobox
+        @return: float timebase
+        """
+        time = self.comboBoxTime.itemData(self.comboBoxTime.currentIndex())
+        return time
 
     def _groupsChanged(self, value):
         """
