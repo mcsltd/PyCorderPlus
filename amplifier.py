@@ -31,8 +31,19 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 import time
 
 from scipy import signal
-from PyQt6.QtWidgets import QFrame, QApplication
+from PyQt6.QtWidgets import (QFrame,
+                             QApplication,
+                             QLabel,
+                             QGridLayout,
+                             QSpacerItem,
+                             QSizePolicy,
+                             QComboBox,
+                             QRadioButton,
+                             QGroupBox)
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QFont
+
+
 
 from modbase import *
 from actichamp_w import *
@@ -107,11 +118,8 @@ class AMP_ActiChamp(ModuleBase):
         # date and time of acquisition start
         self.start_time = datetime.datetime.now()
 
-        # ToDo: create online configuration pane
+        # online configuration pane
         self.online_cfg = _OnlineCfgPane(self)
-
-        # ToDo: rewrite this signal
-        # self.connect(self.online_cfg, Qt.SIGNAL("modeChanged(int)"), self._online_mode_changed)
         self.online_cfg.modeChanged.connect(self._online_mode_changed)
 
         # impedance interval timer
@@ -135,6 +143,49 @@ class AMP_ActiChamp(ModuleBase):
         Get the online configuration pane
         """
         return self.online_cfg
+
+    def get_configuration_pane(self):
+        ''' Get the configuration pane if available.
+        Qt widgets are not reusable, so we have to create it every time
+        '''
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        # read amplifier configuration
+        self.amp.readConfiguration(self.sample_rate['base'], force=True)
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
+        # create configuration pane
+        if AMP_MONTAGE:
+            # config = _ConfigurationPane(self)
+            config = _DeviceConfigurationPane(self)
+            pass
+        else:
+            config = _DeviceConfigurationPane(self)
+        config.dataChanged.connect(self._configuration_changed)
+        config.emulationChanged.connect(self._emulation_changed)
+        config.rateChanged.connect(self._samplerate_changed)
+        return config
+
+    def _samplerate_changed(self, index):
+        ''' SIGNAL from configuration pane if sample rate has changed
+        '''
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.sample_rate = self.sample_rates[index]
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
+
+    def _configuration_changed(self):
+        ''' SIGNAL from configuration pane if values has changed
+        '''
+        self.update_receivers()
+
+    def _emulation_changed(self, index):
+        ''' SIGNAL from configuration pane if emulation mode has changed
+        '''
+        try:
+            self.amp.setEmulationMode(index)
+        except Exception as e:
+            self.send_exception(e)
+        self.update_receivers()
 
     def _online_mode_changed(self, new_mode):
         """ SIGNAL from online configuration pane if recording mode has changed
@@ -634,6 +685,176 @@ class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
             self.pushButtonStartTest.setChecked(True)
         else:
             self.pushButtonStop.setChecked(True)
+
+
+'''
+Amplifier module configuration GUI(with input device selection).
+'''
+
+
+class _DeviceConfigurationPane(QFrame):
+    """
+    ActiChamp configuration pane
+    """
+
+    rateChanged = pyqtSignal(int)
+    emulationChanged = pyqtSignal(int)
+    dataChanged = pyqtSignal()
+
+    def __init__(self, amplifier, *args):
+        # apply(Qt.QFrame.__init__, (self,) + args)
+        super().__init__()
+
+        # reference to our parent module
+        self.amplifier = amplifier
+
+        # Set tab name
+        self.setWindowTitle("Amplifier")
+
+        # make it nice
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShadow(QFrame.Shadow.Raised)
+
+        # base layout
+        self.gridLayout = QGridLayout(self)
+
+        # spacers
+        self.vspacer_1 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.vspacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.vspacer_3 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.hspacer_1 = QSpacerItem(20, 40, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        # create the amplifier GUI elements
+        self.comboBoxSampleRate = QComboBox()
+        self.comboBoxEmulation = QComboBox()
+        self.label_Simulated = QLabel()
+
+        self.labelPLL = QLabel("PLL Input")
+        self.radioPllInternal = QRadioButton("Internal")
+        self.radioPllExternal = QRadioButton("External")
+
+        self.label_AvailableChannels = QLabel("Available channels: 32 EEG and 5 AUX")
+        self.label_AvailableChannels.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        # self.label_AvailableChannels.setIndent(20)
+        font = QFont("Ms Shell Dlg 2", 10)
+        self.label_AvailableChannels.setFont(font)
+
+        self.label_1 = QLabel("Sampling Rate")
+        self.label_2 = QLabel("[Hz]")
+        self.label_3 = QLabel("Simulation")
+        self.label_4 = QLabel("Module(s)")
+
+        # group amplifier elements
+        self.groupAmplifier = QGroupBox("Amplifier Configuration")
+
+        self.gridLayoutAmp = QGridLayout()
+        self.gridLayoutAmp.addWidget(self.label_1, 0, 0)
+        self.gridLayoutAmp.addWidget(self.comboBoxSampleRate, 0, 1)
+        self.gridLayoutAmp.addWidget(self.label_2, 0, 2)
+        self.gridLayoutAmp.addWidget(self.label_3, 1, 0)
+        self.gridLayoutAmp.addWidget(self.comboBoxEmulation, 1, 1)
+        self.gridLayoutAmp.addWidget(self.label_4, 1, 2)
+        self.gridLayoutAmp.addWidget(self.label_Simulated, 2, 1, 1, 2)
+
+        self.gridLayoutAmp.addWidget(self.labelPLL, 3, 0)
+        self.gridLayoutAmp.addWidget(self.radioPllInternal, 3, 1)
+        self.gridLayoutAmp.addWidget(self.radioPllExternal, 4, 1)
+        self.gridLayoutAmp.addItem(self.vspacer_1, 5, 0, 1, 3)
+
+        self.gridLayoutAmpGroup = QGridLayout()
+        self.gridLayoutAmpGroup.addLayout(self.gridLayoutAmp, 0, 0, 2, 1)
+        self.gridLayoutAmpGroup.addItem(self.hspacer_1, 0, 1)
+        self.gridLayoutAmpGroup.addWidget(self.label_AvailableChannels, 0, 2)
+        self.gridLayoutAmpGroup.addItem(self.vspacer_2, 1, 1)
+
+        self.groupAmplifier.setLayout(self.gridLayoutAmpGroup)
+
+        # get the device configuration widget
+        # self.device_cfg = self.amplifier.inputDevices.get_configuration_widget()
+
+        # group device elements
+        # self.groupDevices = QGroupBox("Optional Input Devices")
+        # self.gridLayoutDeviceGroup = QGridLayout()
+        # # self.gridLayoutDeviceGroup.addWidget(self.device_cfg, 0, 0)
+        # self.groupDevices.setLayout(self.gridLayoutDeviceGroup)
+
+        # add all items to the main layout
+        self.gridLayout.addWidget(self.groupAmplifier, 0, 0)
+        # self.gridLayout.addWidget(self.groupDevices, 1, 0)
+
+        # actions
+        self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
+        self.comboBoxEmulation.currentIndexChanged.connect(self._emulationChanged)
+        # ToDo: self.connect(self.amplifier.inputDevices, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
+
+        # emulation combobox
+        self.comboBoxEmulation.addItems(["off", "1", "2", "3", "4", "5"])
+        self.comboBoxEmulation.setCurrentIndex(self.amplifier.amp.getEmulationMode())
+
+        # sample rate combobox
+        sr_index = -1
+        for sr in self.amplifier.sample_rates:
+            self.comboBoxSampleRate.addItem(sr['rate'])
+            if sr == self.amplifier.sample_rate:
+                sr_index = self.comboBoxSampleRate.count() - 1
+        self.comboBoxSampleRate.setCurrentIndex(sr_index)
+
+        # available channels display
+        self._updateAvailableChannels()
+
+        # PLL configuration
+        self.radioPllExternal.setChecked(self.amplifier.amp.PllExternal != 0)
+        self.radioPllInternal.setChecked(self.amplifier.amp.PllExternal == 0)
+        self.showPllParams(self.amplifier.amp.hasPllOption())
+        self.radioPllExternal.toggled.connect(self._pllExternalToggled)
+
+    def _samplerate_changed(self, index):
+        ''' SIGNAL sample rate combobox value has changed
+        '''
+        if index >= 0:
+            # notify parent about changes
+            self.rateChanged.emit(index)
+            self._updateAvailableChannels()
+
+    def _emulationChanged(self, index):
+        ''' SIGNAL emulation mode combobox value has changed
+        '''
+        if index >= 0:
+            # notify parent about changes
+            self.emulationChanged.emit(index)
+            # simulated channels
+            if index > 0:
+                self.label_Simulated.setText("simulating %i + 8 channels" % (index * 32))
+            else:
+                self.label_Simulated.setText("")
+            self._updateAvailableChannels()
+
+    def _configurationDataChanged(self):
+        # self.emit(Qt.SIGNAL('dataChanged()'))
+        self.dataChanged.emit()
+
+    def _updateAvailableChannels(self):
+        eeg = self.amplifier.amp.properties.CountEeg
+        aux = self.amplifier.amp.properties.CountAux
+        if self.amplifier.amp.getEmulationMode() == 0:
+            amp = "actiCHamp"
+        else:
+            amp = "Simulation"
+        self.label_AvailableChannels.setText("Amplifier: %s\n\nAvailable channels: %d EEG and %d AUX" % (amp, eeg, aux))
+
+    def showEvent(self, event):
+        pass
+
+    def showPllParams(self, show):
+        self.labelPLL.setVisible(show)
+        self.radioPllExternal.setVisible(show)
+        self.radioPllInternal.setVisible(show)
+
+    def _pllExternalToggled(self, checked):
+        if checked:
+            self.amplifier.amp.PllExternal = 1
+        else:
+            self.amplifier.amp.PllExternal = 0
 
 
 class Receiver(ModuleBase):
