@@ -626,6 +626,7 @@ Display module configuration panes.
 class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
     """ Display online configuration pane
     """
+
     def __init__(self, *args):
         """
         Constructor
@@ -669,8 +670,7 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
 
         # ToDo: actions
         self.comboBoxGroupSize.currentIndexChanged.connect(self._groupsChanged)
-        # self.connect(self.comboBoxChannels, Qt.SIGNAL("currentIndexChanged(int)"),
-        #              self._channelsChanged)
+        self.comboBoxChannels.setCurrentIndex.connect(self._channelsChanged)
         # self.connect(self.checkBoxBaseline, Qt.SIGNAL("toggled(bool)"),
         #              self._baselineToggled)
         # self.connect(self.comboBoxScale, Qt.SIGNAL("currentIndexChanged(int)"),
@@ -717,6 +717,70 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
 
             self.comboBoxChannels.setCurrentIndex(0)
 
+    def _channelsChanged(self, value):
+        """
+        Channel selection changed
+        Switch scale value for EEG and AUX channels
+        """
+        self.set_scale(self.eeg_scale, self.aux_scale)
+
+    def set_scale(self, eeg_scale, aux_scale):
+        """ Update scale combobox selection
+        @return: selected value
+        """
+        self.eeg_scale = eeg_scale
+        self.aux_scale = aux_scale
+
+        if self._isEegGroup():
+            idx = self._get_cb_index(self.comboBoxScale, self.eeg_scale, True)
+        else:
+            idx = self._get_cb_index(self.comboBoxScale, self.aux_scale, True)
+
+        if idx >= 0:
+            self.comboBoxScale.setCurrentIndex(idx)
+        return self.get_scale()
+
+    def _isEegGroup(self):
+        """ Get info about current selected channel group
+        """
+        # ToDo: rewrite
+        # if not (ChannelGroup.EEG in self.group_slices):
+        #     return False
+        # channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex()).toPyObject()
+        # if channel_slice in self.group_slices[ChannelGroup.EEG]:
+        #     return True
+        # return False
+        pass
+
+    def _get_cb_index(self, cb, value, isdata):
+        """
+        Get closest matching combobox index
+        @param cb: combobox object
+        @param value: float lookup value
+        @param isdata: lookup values in item data
+        """
+        itemlist = []
+        for i in range(cb.count()):
+            if isdata:
+                # ToDo check: val = cb.itemData(i).toPyObject()
+                val = cb.itemData(i).toPyObject()
+            else:
+                val = float(cb.itemText(i))
+            itemlist.append((i, val))
+        idx = itemlist[-1][0]
+        for item in sorted(itemlist, key=itemgetter(1)):
+            if item[1] >= value:
+                idx = item[0]
+                break
+        return idx
+
+    def get_scale(self):
+        """ Get current selected scale value from combobox
+        @return: float scale
+        """
+        # ToDo check: scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex()).toPyObject()
+        scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex())
+        return scale
 
 
 if __name__ == "__main__":
