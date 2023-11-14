@@ -245,7 +245,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         # down sample and copy raw data to ring buffer
         offset = 0
         for buf in self.buffer:
-            print(buf)
             if self.channel_group.shape[0] > offset:
                 # r = self.rebin(self.channel_group[offset], tuple([down]))
                 r = -self.channel_group[offset][self.binningoffset::self.binning]
