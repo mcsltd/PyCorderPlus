@@ -1027,6 +1027,69 @@ class ActiChamp:
             raise AmpError("failed to read device status", err)
         return status.Samples, status.Errors, status.Rate, status.Speed
 
+    def readConfiguration(self, rate, force=False):
+        """ Update device sampling rate and get new configuration
+        @param rate: device base sampling rate
+        """
+        # not possible if device is already open or not necessary if rate has not changed
+        if (self.devicehandle != 0 or rate == self.settings.Rate) and not force:
+            return
+        # update sampling rate and get new configuration
+        try:
+            self.open()
+            self.setup(self.settings.Mode, rate, self.binning)
+        except:
+            pass
+
+        try:
+            self.close()
+        except:
+            pass
+
+    def setEmulationMode(self, modules):
+        ''' Set/Reset emulation flag in INI file
+        @param modules: number of modules to emulate, 0= no emulation
+        '''
+        # not possible if device is already open
+        if self.devicehandle != 0:
+            return
+
+        # write new settings to INI file
+        ini = configparser.ConfigParser()
+        if self.x64:
+            filename = "ActiChamp_x64.dll.ini"
+        else:
+            filename = "ActiChamp_x86.dll.ini"
+
+        if len(ini.read(filename)) > 0:
+            if modules > 0:
+                channels = modules * 32
+                ini.set("Main", "Emulation", "1")
+                ini.set("Emulation", "Model", repr(channels))
+            else:
+                ini.set("Main", "Emulation", "0")
+            # ToDo: add with open ...
+            fp = open(filename, "w")
+            ini.write(fp)
+            fp.close()
+        else:
+            raise AmpError("INI file %s not found" % filename)
+
+        # reload the DLL
+        self.loadLib()
+        # get new configuration
+        try:
+            self.open()
+            self.getDeviceInfo()
+            self.setup(self.settings.Mode, self.settings.Rate, self.binning)
+        except:
+            pass
+
+        try:
+            self.close()
+        except:
+            pass
+
 
 if __name__ == "__main__":
     obj = ActiChamp()
