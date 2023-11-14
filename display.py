@@ -668,14 +668,55 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
             self.comboBoxTime.addItem(text, val)  # add text and value
 
         # ToDo: actions
-        # self.connect(self.comboBoxGroupSize, Qt.SIGNAL("currentIndexChanged(int)"),
-        #              self._groupsChanged)
+        self.comboBoxGroupSize.currentIndexChanged.connect(self._groupsChanged)
         # self.connect(self.comboBoxChannels, Qt.SIGNAL("currentIndexChanged(int)"),
         #              self._channelsChanged)
         # self.connect(self.checkBoxBaseline, Qt.SIGNAL("toggled(bool)"),
         #              self._baselineToggled)
         # self.connect(self.comboBoxScale, Qt.SIGNAL("currentIndexChanged(int)"),
         #              self._scaleChanged)
+
+    def _groupsChanged(self, value):
+        """
+        Group size selection changed
+        """
+        if value >= 0:
+            self.group_size = int(self.comboBoxGroupSize.currentText())
+        else:
+            self.group_size = 32
+        self._slice_channels()
+
+    def _slice_channels(self):
+        """
+        Create channel group slices
+        """
+        if len(self.group_indices) == 0:
+            return
+
+        # create channel groups of group_size
+        slices = defaultdict(list)
+        for group, channels in self.group_indices.items():
+            for si in channels[0::self.group_size]:
+                sl = slice(si, min(si + self.group_size, channels[-1] + 1), 1)
+                slices[group].append(sl)
+
+        # new channel selection content ?
+        if self.group_slices != slices:
+            self.comboBoxChannels.clear()
+            self.group_slices = slices
+            for group, slice_list in slices.items():
+                if group in range(len(ChannelGroup.Name)):
+                    group_name = ChannelGroup.Name[group]
+                else:
+                    group_name = "?"
+                for sl in slice_list:
+                    offset = slice_list[0].start
+                    self.comboBoxChannels.addItem("%s %d-%d" % (group_name,
+                                                                sl.start - offset + 1,
+                                                                sl.stop - offset), sl)
+
+            self.comboBoxChannels.setCurrentIndex(0)
+
 
 
 if __name__ == "__main__":
