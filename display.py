@@ -157,6 +157,11 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.update_display = False
         self.dataavailable = False
 
+    def get_online_configuration(self):
+        """ Get the online configuration pane
+        """
+        return self.online_cfg
+
     def get_display_pane(self):
         """
         Get the signal display pane
@@ -180,14 +185,15 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         '''
         if params is not None:
             self.eeg = params
-            # ToDo: self.online_cfg.update_content(self.eeg)
+            self.online_cfg.update_content(self.eeg)
             self.arrangeTraces()
             self.replot()
         return params
 
     def process_start(self):
-        ''' Module start command.
-        '''
+        """
+        Module start command.
+        """
         # reset timing test timer
         self.ttime = -1.0
 
@@ -223,9 +229,8 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         """
         Copy all traces from input buffer to display transfer buffer
         """
-        # select the requested channel group
-        self.channel_slice = slice(0, 16, 1)
 
+        # select the requested channel group
         self.channel_group = self.eeg.eeg_channels[self.channel_slice]
         self.channel_group_properties = self.eeg.channel_properties[self.channel_slice]
 
@@ -240,6 +245,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         # down sample and copy raw data to ring buffer
         offset = 0
         for buf in self.buffer:
+            print(buf)
             if self.channel_group.shape[0] > offset:
                 # r = self.rebin(self.channel_group[offset], tuple([down]))
                 r = -self.channel_group[offset][self.binningoffset::self.binning]
@@ -266,8 +272,8 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             sc = self.eeg.sample_channel[0][self.binningoffset::self.binning]  # down sample the sample counter buffer
             scLeft = sc[
                          len(sc) - self.writePointer - 1] / self.eeg.sample_rate  # sample counter at the leftmost screen position
-            self.TimeScale.setOffset(scLeft)
-            self.update()
+            # self.TimeScale.setOffset(scLeft)
+            # self.update()
 
         # calculate signal baselines for display baseline correction
         if self.baseline_request and (self.writePointer > 10):
@@ -285,11 +291,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         offset = np.arange(channels, 0, -1).reshape(-1, 1) - 0.8
 
         # baseline correction
-        # if self.online_cfg.checkBoxBaseline.isChecked():
-        #     buffer = (self.buffer - self.baselines) * scale + offset
-        # else:
-        #     buffer = self.buffer * scale + offset
-        buffer = (self.buffer - self.baselines) * scale + offset
+        if self.online_cfg.checkBoxBaseline.isChecked():
+            buffer = (self.buffer - self.baselines) * scale + offset
+        else:
+            buffer = self.buffer * scale + offset
 
         # clip to visible area
         buffer.clip(bottomMargin, topMargin, out=self.displaybuffer)
@@ -342,7 +347,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             pc = Qwt.QwtPlotCurve(title)
             pc.setPen(QPen(color, 0))
             pc.setYAxis(Qwt.QwtPlot.yLeft)
-            pc.setCurveAttribute(Qwt.QwtPlotCurve.Lines.PaintFiltered)
+            # pc.setCurveAttribute(Qwt.QwtPlotCurve.PaintFiltered)
             pc.attach(self)
             self.traces.append(pc)
 
@@ -553,6 +558,84 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         #                             EventType.COMMAND,
         #                             info="ChannelSelected",
         #                             cmd_value=plotitem.title().text()))
+
+    def getXML(self):
+        ''' Get module properties for XML configuration file
+        @return: objectify XML element::
+            e.g.
+            <DISP_Scope instance="0" version="1">
+                <timebase>1000</timebase>
+                ...
+            </DISP_Scope>
+        '''
+        # eeg_scale, aux_scale = self.online_cfg.get_groupscale()
+        # E = objectify.E
+        # cfg = E.DISP_Scope(E.timebase(self.online_cfg.get_timebase()),
+        #                    E.eegscale(eeg_scale),
+        #                    E.auxscale(aux_scale),
+        #                    E.groupsize(self.online_cfg.get_groupsize()),
+        #                    E.baseline(self.online_cfg.checkBoxBaseline.isChecked()),
+        #                    version=str(self.xmlVersion),
+        #                    instance=str(self._instance),
+        #                    module="display")
+        # return cfg
+        pass
+
+    def setXML(self, xml):
+        ''' Set module properties from XML configuration file
+        @param xml: complete objectify XML configuration tree,
+        module will search for matching values
+        '''
+        # # search my configuration data
+        # displays = xml.xpath("//DISP_Scope[@module='display' and @instance='%i']" % (self._instance))
+        # if len(displays) == 0:
+        #     # configuration data not found, leave everything unchanged
+        #     return
+        #
+        #     # we should have only one display instance from this type
+        # cfg = displays[0]
+        #
+        # # check version, has to be lower or equal than current version
+        # version = cfg.get("version")
+        # if (version == None) or (int(version) > self.xmlVersion):
+        #     self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+        #     return
+        # version = int(version)
+        #
+        # # get the values
+        # try:
+        #     # set closest matching timebase
+        #     timebase = cfg.timebase.pyval
+        #     if version < 4:
+        #         timebase = float(timebase) * 10.0
+        #     self.timebase = self.online_cfg.set_timebase(timebase)
+        #
+        #     if version > 1:
+        #         # set closest matching scale
+        #         if version < 4:
+        #             eeg_scale = float(cfg.scale.pyval)
+        #             aux_scale = float(cfg.scale.pyval)
+        #         elif version < 5:
+        #             eeg_scale = cfg.scale.pyval
+        #             aux_scale = cfg.scale.pyval
+        #         else:
+        #             eeg_scale = cfg.eegscale.pyval
+        #             aux_scale = cfg.auxscale.pyval
+        #         self.setScale(self.online_cfg.set_scale(eeg_scale, aux_scale))
+        #
+        #         # set closest matching group size
+        #         size = cfg.groupsize.pyval
+        #         if version < 4:
+        #             size = float(size)
+        #         self.online_cfg.set_groupsize(size)
+        #
+        #     if version > 2:
+        #         # get baseline correction flag
+        #         self.online_cfg.checkBoxBaseline.setChecked(cfg.baseline.pyval)
+        #
+        # except Exception as e:
+        #     self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+        pass
 
 
 class _ScopeLegend(Qwt.QwtLegend):
@@ -769,7 +852,7 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         for i in range(cb.count()):
             if isdata:
                 # ToDo check: val = cb.itemData(i).toPyObject()
-                val = cb.itemData(i).toPyObject()
+                val = cb.itemData(i)
             else:
                 val = float(cb.itemText(i))
             itemlist.append((i, val))
@@ -831,6 +914,19 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         '''
         size = float(self.comboBoxGroupSize.currentText())
         return size
+
+    def update_content(self, eeg):
+        """
+        Update group selection content from EEG configuration block
+        """
+        # find all different groups
+        groups = defaultdict(list)
+        for idx, channel in enumerate(eeg.channel_properties):
+            groups[channel.group].append(idx)
+        self.group_indices = dict(groups)
+
+        # create channel groups
+        self._slice_channels()
 
 
 if __name__ == "__main__":
