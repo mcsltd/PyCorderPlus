@@ -668,14 +668,12 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         for text, val in sorted(times.items(), key=itemgetter(1)):
             self.comboBoxTime.addItem(text, val)  # add text and value
 
-        # ToDo: actions
+        # actions
         self.comboBoxGroupSize.currentIndexChanged.connect(self._groupsChanged)
         self.comboBoxChannels.setCurrentIndex.connect(self._channelsChanged)
         self.checkBoxBaseline.toggled.connect(self._baselineToggled)
+        self.comboBoxScale.currentIndexChanged.connect(self._scaleChanged)
 
-
-        # self.connect(self.comboBoxScale, Qt.SIGNAL("currentIndexChanged(int)"),
-        #              self._scaleChanged)
 
     def _groupsChanged(self, value):
         """
@@ -791,6 +789,15 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
             self.pushButton_Now.setEnabled(True)
         else:
             self.pushButton_Now.setEnabled(False)
+
+    def _scaleChanged(self, value):
+        """
+        Scale value changed by user, copy new value to local vars
+        """
+        if self._isEegGroup():
+            self.eeg_scale = self.get_scale()
+        else:
+            self.aux_scale = self.get_scale()
 
 
 if __name__ == "__main__":
