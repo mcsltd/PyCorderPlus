@@ -16,7 +16,7 @@ class Ui_frmConfiguration(object):
         frmConfiguration.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
         frmConfiguration.resize(861, 743)
         icon = QtGui.QIcon()
-        with path("", "process.png") as f_path:
+        with path("res", "process.png") as f_path:
             icon.addPixmap(QtGui.QPixmap(str(f_path)), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         frmConfiguration.setWindowIcon(icon)
         self.gridLayout = QtWidgets.QGridLayout(frmConfiguration)
