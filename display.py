@@ -72,14 +72,13 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         # self.setTitle('ActiChamp');
         self.setCanvasBackground(QBrush(Qt.GlobalColor.white))
 
-        # ToDo: create online configuration pane
+        # create online configuration pane
         self.online_cfg = _OnlineCfgPane()
         self.online_cfg.comboBoxTime.activated.connect(self.timebaseChanged)
         self.online_cfg.comboBoxScale.currentIndexChanged.connect(self.scaleChanged)
         self.online_cfg.comboBoxChannels.currentIndexChanged.connect(self.channelsChanged)
         self.online_cfg.pushButton_Now.clicked.connect(self.baselineNowClicked)
         self.online_cfg.checkBoxBaseline.stateChanged.connect(self.baselineNowClicked)
-
 
         # legend
         legend = _ScopeLegend()
@@ -167,10 +166,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
     def setDefault(self):
         ''' Set all module parameters to default values
         '''
-        # ToDo: self.setScale(self.online_cfg.set_scale(100.0, 1000.0))  # EEG: 100µV, AUX: 1000µV / Division
-        # self.timebase = self.online_cfg.set_timebase(10.0)  # 10s / Screen
-        # self.online_cfg.set_groupsize(16)  # group size 16 channels
-        # self.online_cfg.checkBoxBaseline.setChecked(True)  # baseline correction enabled
+        self.setScale(self.online_cfg.set_scale(100.0, 1000.0))  # EEG: 100µV, AUX: 1000µV / Division
+        self.timebase = self.online_cfg.set_timebase(10.0)  # 10s / Screen
+        self.online_cfg.set_groupsize(16)  # group size 16 channels
+        self.online_cfg.checkBoxBaseline.setChecked(True)  # baseline correction enabled
 
         # update display
         self.process_update(self.eeg)
@@ -806,6 +805,32 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
             self.eeg_scale = self.get_scale()
         else:
             self.aux_scale = self.get_scale()
+
+    def set_timebase(self, time):
+        """
+        Update timebase combobox selection
+        @return: selected value
+        """
+        idx = self._get_cb_index(self.comboBoxTime, time, True)
+        if idx >= 0:
+            self.comboBoxTime.setCurrentIndex(idx)
+        return self.get_timebase()
+
+    def set_groupsize(self, size):
+        """ Update groupsize combobox selection
+        @return: selected value
+        """
+        idx = self._get_cb_index(self.comboBoxGroupSize, size, False)
+        if idx >= 0:
+            self.comboBoxGroupSize.setCurrentIndex(idx)
+        return self.get_groupsize()
+
+    def get_groupsize(self):
+        ''' Get current selected group size value from combobox
+        @return: float size
+        '''
+        size = float(self.comboBoxGroupSize.currentText())
+        return size
 
 
 if __name__ == "__main__":
