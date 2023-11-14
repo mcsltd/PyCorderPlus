@@ -671,8 +671,9 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         # ToDo: actions
         self.comboBoxGroupSize.currentIndexChanged.connect(self._groupsChanged)
         self.comboBoxChannels.setCurrentIndex.connect(self._channelsChanged)
-        # self.connect(self.checkBoxBaseline, Qt.SIGNAL("toggled(bool)"),
-        #              self._baselineToggled)
+        self.checkBoxBaseline.toggled.connect(self._baselineToggled)
+
+
         # self.connect(self.comboBoxScale, Qt.SIGNAL("currentIndexChanged(int)"),
         #              self._scaleChanged)
 
@@ -781,6 +782,15 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         # ToDo check: scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex()).toPyObject()
         scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex())
         return scale
+
+    def _baselineToggled(self, checked):
+        """
+        Baseline correction on/off
+        """
+        if checked:
+            self.pushButton_Now.setEnabled(True)
+        else:
+            self.pushButton_Now.setEnabled(False)
 
 
 if __name__ == "__main__":
