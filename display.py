@@ -30,19 +30,25 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 
 B{Revision:} $LastChangedRevision: 197 $
 '''
+import time
+
 import qwt
 import qwt as Qwt
 
 from qwt.scale_widget import QwtScaleWidget
 
+from res import frmScopeOnline
 from modbase import *
+
+from operator import itemgetter
+from collections import defaultdict
+
 from PyQt6.QtCore import QSize, Qt, QRect, QPoint
 from PyQt6.QtWidgets import QApplication, QFrame
 from PyQt6.QtGui import QBrush, QPen, QFont
 
 
-
-class DISP_Scope(Qwt.QwtPlot, ModuleBase):
+class DISP_Scope(qwt.QwtPlot, ModuleBase):
     """
     EEG signal display widget.
     """
@@ -67,7 +73,7 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         self.setCanvasBackground(QBrush(Qt.GlobalColor.white))
 
         # ToDo: create online configuration pane
-        # self.online_cfg = _OnlineCfgPane()
+        self.online_cfg = _OnlineCfgPane()
         # self.connect(self.online_cfg.comboBoxTime, Qt.SIGNAL("activated(QString)"),
         #              self.timebaseChanged)
         # self.connect(self.online_cfg.comboBoxScale, Qt.SIGNAL("currentIndexChanged(QString)"),
@@ -82,7 +88,7 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         # legend
         legend = _ScopeLegend()
         legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        legend.setDefaultItemMode(Qwt.QwtLegend.itemClicked)
+        legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
         self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
         # self.connect(self, Qt.SIGNAL("legendClicked(QwtPlotItem*)"),
         #              self.channelItemClicked)
@@ -117,9 +123,6 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         self.plotscale.setAlignment(qwt.QwtScaleDraw.RightScale)
         self.plotscale.setBorderDist(5, 0)
         # self.plotscale.attach(self)
-
-
-
 
         # reset trace buffer
         self.traces = []
@@ -207,13 +210,13 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         # timing test functions
         # first call
         if self.ttime < 0:
-            self.ttime = time.clock()
+            self.ttime = time.process_time()
             self.tcount = 30.0
         else:
-            if time.clock() >= self.ttime + self.tcount:
+            if time.process_time() >= self.ttime + self.tcount:
                 # send status info
                 info = "Received Samples = %d / Sample Counter = %d / Time = %.3fs" \
-                       % (self.eeg.sample_counter, self.eeg.sample_channel[0, -1] + 1, time.clock() - self.ttime)
+                       % (self.eeg.sample_counter, self.eeg.sample_channel[0, -1] + 1, time.process_time() - self.ttime)
                 # self.send_event(ModuleEvent(self._object_name, EventType.MESSAGE))
                 self.tcount += 30.0
 
@@ -225,6 +228,8 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         Copy all traces from input buffer to display transfer buffer
         """
         # select the requested channel group
+        self.channel_slice = slice(0, 16, 1)
+
         self.channel_group = self.eeg.eeg_channels[self.channel_slice]
         self.channel_group_properties = self.eeg.channel_properties[self.channel_slice]
 
@@ -265,8 +270,8 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
             sc = self.eeg.sample_channel[0][self.binningoffset::self.binning]  # down sample the sample counter buffer
             scLeft = sc[
                          len(sc) - self.writePointer - 1] / self.eeg.sample_rate  # sample counter at the leftmost screen position
-            # self.TimeScale.setOffset(scLeft)
-            # self.update()
+            self.TimeScale.setOffset(scLeft)
+            self.update()
 
         # calculate signal baselines for display baseline correction
         if self.baseline_request and (self.writePointer > 10):
@@ -361,7 +366,7 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         @param label: label string
         @param samplecounter: total sample position
         '''
-        margin = float(len(self.traces) + 1) / 10.0 / 3.0 # 2.5% bottom margin
+        margin = float(len(self.traces) + 1) / 10.0 / 3.0  # 2.5% bottom margin
         sym = Qwt.QwtSymbol()
         sym.setStyle(Qwt.QwtSymbol.VLine)
         sym.setSize(20)
@@ -390,7 +395,7 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
                     color = Qt.GlobalColor.green
                 else:
                     color = self.channel_group_properties[pccount].color
-                if (self.traces[pccount].pen().color != color):
+                if self.traces[pccount].pen().color != color:
                     self.traces[pccount].setPen(QPen(color, 0))
                     title = self.traces[pccount].title()
                     title.setColor(color)
@@ -420,9 +425,9 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
             # release thread lock
             self._thLock.release()
 
-            t = time.clock()
+            t = time.process_time()
             self.replot()
-            displayTime = time.clock() - t
+            displayTime = time.process_time() - t
 
     def setTimebase(self, timebase):
         ''' Change the display timebase
@@ -450,14 +455,14 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         self.baseline_request = True
 
         # update X axis scale
-        self.grid.setMinPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.DotLine))
+        self.grid.setMinorPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.DotLine))
         if timebase < 1.0:
             major = 0.1
             self.setAxisMaxMinor(Qwt.QwtPlot.xBottom, 5)
         elif timebase > 10.0:
             major = 10.0
             self.setAxisMaxMinor(Qwt.QwtPlot.xBottom, 10)
-            self.grid.setMinPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.SolidLine))
+            self.grid.setMinorPen(QPen(Qt.GlobalColor.gray, 0, Qt.PenStyle.SolidLine))
         else:
             major = 1.0
             self.setAxisMaxMinor(Qwt.QwtPlot.xBottom, 5)
@@ -476,8 +481,8 @@ class DISP_Scope(Qwt.QwtPlot, ModuleBase):
         @param scale: new scale value in µV/Div
         '''
         self.scale = scale
-        ticks = list(np.arange(0.0, scale*11.0, scale))
-        yScaleDiv = Qwt.QwtScaleDiv(0.0, scale*10.0, [], ticks, [])
+        ticks = list(np.arange(0.0, scale * 11.0, scale))
+        yScaleDiv = Qwt.QwtScaleDiv(0.0, scale * 10.0, [], ticks, [])
         self.plotscale.setScaleDiv(yScaleDiv)
         self.replot()
 
@@ -557,7 +562,7 @@ class _ScopeLegend(Qwt.QwtLegend):
         """
 
     def __init__(self, *args):
-        super().__init__()
+        super().__init__(*args)
         layout = self.contentsWidget().layout()
         layout.setSpacing(0)
 
@@ -577,7 +582,6 @@ class _ScopeLegend(Qwt.QwtLegend):
         viewport = self.contentsWidget().parentWidget()
         visibleSize = viewport.size()
         items = self.legendItems()
-        print(self.sizeHint())
         itemspace = float(visibleSize.height() - (topMargin + bottomMargin)) / (self.itemCount() + 1)
         offset = itemspace * 0.8 - itemspace * 0.5 + topMargin
         yBottom = 0
@@ -612,6 +616,66 @@ class _TimeScaleDraw(Qwt.QwtScaleDraw):
     def setOffset(self, offset):
         self._offset = offset
         Qwt.QwtScaleDraw.invalidateCache(self)
+
+
+"""
+Display module configuration panes.
+"""
+
+
+class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
+    """ Display online configuration pane
+    """
+    def __init__(self, *args):
+        """
+        Constructor
+        """
+        super().__init__()
+        self.setupUi(self)
+
+        # set default values
+        self.group_indices = dict()
+        self.group_slices = defaultdict(list)
+
+        self.group_size = int(self.comboBoxGroupSize.currentText())
+
+        self.checkBoxBaseline.setChecked(False)
+        self.pushButton_Now.setEnabled(False)
+
+        self.eeg_scale = float(self.comboBoxScale.currentText())
+        self.aux_scale = self.eeg_scale
+
+        # fill scale combo box list
+        scales = {u"0.5 µV": 0.5, u"1 µV": 1.0, u"2 µV": 2.0, u"5 µV": 5.0,
+                  u"10 µV": 10.0, u"20 µV": 20.0, u"50 µV": 50.0,
+                  u"100 µV": 100.0, u"200 µV": 200.0, u"500 µV": 500.0,
+                  u"1 mV": 1000.0, u"2 mV": 2000.0, u"5 mV": 5000.0,
+                  u"10 mV": 10000.0, u"20 mV": 20000.0, u"50 mV": 50000.0,
+                  u"100 mV": 100000.0, u"200 mV": 200000.0, u"500 mV": 500000.0,
+                  u"1 V": 1000000.0, u"2 V": 2000000.0, u"5 V": 5000000.0
+                  }
+        self.comboBoxScale.clear()
+        for text, val in sorted(scales.items(), key=itemgetter(1)):
+            self.comboBoxScale.addItem(text, val)  # add text and value
+
+        # fill time combo box list
+        times = {u"0.1 s": 0.1, u"0.2 s": 0.2, u"0.5 s": 0.5,
+                 u"1 s": 1.0, u"2 s": 2.0, u"5 s": 5.0,
+                 u"10 s": 10.0, u"20 s": 20.0, u"50 s": 50.0
+                 }
+        self.comboBoxTime.clear()
+        for text, val in sorted(times.items(), key=itemgetter(1)):
+            self.comboBoxTime.addItem(text, val)  # add text and value
+
+        # ToDo: actions
+        # self.connect(self.comboBoxGroupSize, Qt.SIGNAL("currentIndexChanged(int)"),
+        #              self._groupsChanged)
+        # self.connect(self.comboBoxChannels, Qt.SIGNAL("currentIndexChanged(int)"),
+        #              self._channelsChanged)
+        # self.connect(self.checkBoxBaseline, Qt.SIGNAL("toggled(bool)"),
+        #              self._baselineToggled)
+        # self.connect(self.comboBoxScale, Qt.SIGNAL("currentIndexChanged(int)"),
+        #              self._scaleChanged)
 
 
 if __name__ == "__main__":

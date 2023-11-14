@@ -23,7 +23,7 @@ def InstantiateModules():
     # test modules for control amplifier
     modules = [
         AMP_ActiChamp(),
-        DISP_Scope(),
+        DISP_Scope(instance=0),
         # Receiver()
     ]
     return modules
