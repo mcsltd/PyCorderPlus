@@ -1,10 +1,12 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout
 
 """
 Import GUI resources.
 """
+
 from res import frmMain
+from res import frmMainConfiguration
 
 """
 Import and instantiate recording modules.
@@ -43,6 +45,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # menu actions
         self.actionQuit.triggered.connect(self.close)
 
+        # button actions
+        self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
 
@@ -76,6 +81,20 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 position += 1
 
 
+    def configurationClicked(self):
+        ''' Configuration button clicked
+        - Open configuration dialog and add configuration panes for each module in the
+        module chain, if available
+        '''
+        dlg = DlgConfiguration()
+        for module in flatten(self.modules):
+            pane = module.get_configuration_pane()
+            if pane is not None:
+                dlg.addPane(pane)
+        ok = dlg.exec()
+        # if ok:
+            # self.saveConfiguration()
+
     def defineModuleChain(self):
         """
         Instantiate and arrange module objects
@@ -83,6 +102,47 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         - Additional modules can be connected left -> right with tuples as list objects
         """
         self.modules = InstantiateModules()
+
+
+'''
+------------------------------------------------------------
+MAIN CONFIGURATION DIALOG
+------------------------------------------------------------
+'''
+
+
+class DlgConfiguration(QDialog, frmMainConfiguration.Ui_frmConfiguration):
+    ''' Module main configuration dialog
+    All module configuration panes will go here
+    '''
+
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.panes = []
+
+    def addPane(self, pane):
+        ''' Insert new tab and add module configuration pane
+        @param pane: module configuration pane (QFrame object)
+        '''
+        if pane is None:
+            return
+        currenttabs = len(self.panes)
+        if currenttabs > 0:
+            # add new tab
+            tab = QWidget()
+            tab.setObjectName("tab%d" % (currenttabs + 1))
+            gridLayout = QGridLayout(tab)
+            gridLayout.setObjectName("gridLayout%d" % (currenttabs + 1))
+            self.tabWidget.addTab(tab, "")
+        else:
+            gridLayout = self.gridLayout1
+            tab = self.tab1
+
+        self.panes.append(pane)
+        gridLayout.addWidget(pane)
+        self.tabWidget.setTabText(self.tabWidget.indexOf(tab), pane.windowTitle())
+
 
 
 """
