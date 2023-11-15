@@ -519,8 +519,8 @@ class AMP_ActiChamp(ModuleBase):
                 raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
             self.battery_timer = t
 
-        # ToDo: if self.recording_mode == CHAMP_MODE_IMPEDANCE:
-        #     return self.process_impedance()
+        if self.recording_mode == CHAMP_MODE_IMPEDANCE:
+            return self.process_impedance()
 
         # ToDo: if self.recording_mode == CHAMP_MODE_LED_TEST:
         #     return self.process_led_test()
@@ -619,6 +619,49 @@ class AMP_ActiChamp(ModuleBase):
 
         self.recordtime = time.process_time() - t
 
+        return eeg
+
+    def process_impedance(self):
+        """
+        Get the impedance values from amplifier
+        and return the eeg data block
+        """
+        t = time.process_time()
+        if t - self.impedance_timer < 1.0:
+            return None
+
+        # get impedance values from device
+        imp, disconnected = self.amp.readImpedances()
+
+        # check data rate mismatch messages
+        if imp is None:
+            return None
+
+        eeg_imp = imp[self.eeg_indices]
+        gnd_imp = imp[-1]
+
+        # invalidate the old impedance data list
+        self.eeg_data.impedances = []
+
+        # copy impedance values to data array
+        self.eeg_data.eeg_channels = np.zeros((len(self.channel_indices), 10), 'd')
+        self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.DATA] = eeg_imp
+        self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.GND] = gnd_imp
+
+        # dummy values for trigger and sample counter
+        self.eeg_data.trigger_channel = np.zeros((1, 10), np.uint32)
+        self.eeg_data.sample_channel = np.zeros((1, 10), np.uint32)
+
+        # process connected input devices
+        if not AMP_MONTAGE:
+            # self.inputDevices.process_input(self.eeg_data)
+            pass
+
+        # set recording time
+        self.eeg_data.block_time = datetime.datetime.now()
+
+        # put it into the receiver queues
+        eeg = copy.copy(self.eeg_data)
         return eeg
 
 

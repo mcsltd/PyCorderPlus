@@ -1090,6 +1090,69 @@ class ActiChamp:
         except:
             pass
 
+    def readImpedances(self):
+        ''' Get the electrode impedance values
+        @return: list of impedance values for all EEG channels plus ground electrode in Ohm.
+        '''
+        if not self.running or (self.devicehandle == 0):
+            return None, None
+
+        disconnected = None
+        # read impedance data from device
+        err = self.lib.champImpedanceGetData(self.devicehandle,
+                                             ctypes.byref(self.impbuffer),
+                                             len(self.impbuffer))
+
+        # dummy read data from device
+        err2 = self.lib.champGetData(self.devicehandle,
+                                     ctypes.byref(self.buffer),
+                                     len(self.buffer))
+
+        if err2 == CHAMP_ERR_MONITORING:
+            disconnected = CHAMP_ERR_MONITORING
+
+        if err == CHAMP_ERR_FAIL:
+            return None, None
+
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to read impedance values", err)
+
+        # channel order in buffer is CH1,CH2..CHn, GND
+        items = self.properties.CountEeg + 1
+        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+
+    def readImpedances(self):
+        """
+        Get the electrode impedance values
+        @return: list of impedance values for all EEG channels plus ground electrode in Ohm.
+        """
+        if not self.running or (self.devicehandle == 0):
+            return None, None
+
+        disconnected = None
+        # read impedance data from device
+        err = self.lib.champImpedanceGetData(self.devicehandle,
+                                             ctypes.byref(self.impbuffer),
+                                             len(self.impbuffer))
+
+        # dummy read data from device
+        err2 = self.lib.champGetData(self.devicehandle,
+                                     ctypes.byref(self.buffer),
+                                     len(self.buffer))
+
+        if err2 == CHAMP_ERR_MONITORING:
+            disconnected = CHAMP_ERR_MONITORING
+
+        if err == CHAMP_ERR_FAIL:
+            return None, None
+
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to read impedance values", err)
+
+        # channel order in buffer is CH1,CH2..CHn, GND
+        items = self.properties.CountEeg + 1
+        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+
 
 if __name__ == "__main__":
     obj = ActiChamp()
