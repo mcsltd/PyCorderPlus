@@ -33,14 +33,21 @@ B{Revision:} $LastChangedRevision: 198 $
 
 from modbase import *
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QApplication, QDialog, QHeaderView, QTableWidgetItem)
+from PyQt6.QtCore import Qt, QMetaType, pyqtSignal
+from PyQt6.QtGui import QFont, QIntValidator, QValidator, QColor
+
+from res import frmImpedanceDisplay
+
+import qwt
 
 
 class IMP_Display(ModuleBase):
     """
     Display impedance values
     """
+
+    update = pyqtSignal("PyQt_PyObject")
 
     def __init__(self, *args, **kwargs):
         super().__init__(name="Impedance Display", **kwargs)
@@ -63,7 +70,7 @@ class IMP_Display(ModuleBase):
         Destructor
         """
         # close dialog widget on exit
-        if self.impDialog != None:
+        if self.impDialog is not None:
             self.impDialog.close()
             self.impDialog = None
 
@@ -143,7 +150,7 @@ class IMP_Display(ModuleBase):
             raise ModuleError(self._object_name, "outdated impedance structure received!")
 
         if self.impDialog is not None:
-            # ToDo add emit signal: self.emit(Qt.SIGNAL('update(PyQt_PyObject)'), datablock)
+            self.update.emit(datablock)
             pass
 
     def process_output(self):
@@ -203,6 +210,273 @@ class IMP_Display(ModuleBase):
         # except Exception as e:
         #     self.send_exception(e, severity=ErrorSeverity.NOTIFY)
         pass
+
+
+"""
+Impedance dialog.
+"""
+
+
+class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
+    """
+    Impedance display dialog
+    """
+
+    def __init__(self, module, *args):
+        super().__init__()
+        self.setupUi(self)
+        self.module = module
+        self.params = None  # last received parameter block
+        self.data = None  # last received data block
+
+        # create table view grid (10x16 eeg electrodes + 1 row for ground electrode)
+        cc = 10
+        rc = 16
+        self.tableWidgetValues.setColumnCount(cc)
+        self.tableWidgetValues.setRowCount(rc + 1)
+        self.tableWidgetValues.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # self.tableWidgetValues.horizontalHeader().setDefaultAlignment(Qt.Qt.Alignment(Qt.Qt.AlignCenter))
+        self.tableWidgetValues.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tableWidgetValues.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tableWidgetValues.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        # add ground electrode row
+        self.tableWidgetValues.setSpan(rc, 0, 1, cc)
+        # row headers
+        rheader = []
+        for r in range(rc):
+            rheader.append("%d - %d" % (r * cc + 1, r * cc + cc))
+        rheader.append("GND")
+        self.tableWidgetValues.setVerticalHeaderLabels(rheader)
+        # create cell items
+        fnt = QFont()
+        fnt.setPointSize(8)
+        for r in range(rc):
+            for c in range(cc):
+                item = QTableWidgetItem()
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setFont(fnt)
+                self.tableWidgetValues.setItem(r, c, item)
+
+        # GND electrode cell
+        item = QTableWidgetItem()
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setFont(fnt)
+        item.setText("GND")
+        self.tableWidgetValues.setItem(rc, 0, item)
+        self.defaultColor = item.background().color()
+
+        print(type(self.defaultColor))
+
+        # set range list
+        self.comboBoxRange.clear()
+        self.comboBoxRange.addItem("15")
+        self.comboBoxRange.addItem("50")
+        self.comboBoxRange.addItem("100")
+        self.comboBoxRange.addItem("500")
+
+        # set validators
+        validator = QIntValidator(self)
+        validator.setBottom(15)
+        validator.setTop(500)
+        self.comboBoxRange.setValidator(validator)
+        self.comboBoxRange.setEditText(str(self.module.range_max))
+
+        # setup color scale
+        self.linearscale = False
+        self.scale_engine = qwt.scale_engine.QwtLinearScaleEngine()
+        self.scale_interval = qwt.QwtDoubleInterval(0, self.module.range_max)
+        self.scale_map = qwt.QwtLinearColorMap(Qt.GlobalColor.green, Qt.GlobalColor.red)
+        if self.linearscale:
+            self.scale_map.addColorStop(0.45, Qt.GlobalColor.yellow)
+            self.scale_map.addColorStop(0.55, Qt.GlobalColor.yellow)
+            self.scale_map.setMode(qwt.QwtLinearColorMap.ScaledColors)
+        else:
+            self.scale_map.addColorStop(0.33, Qt.GlobalColor.yellow)
+            self.scale_map.addColorStop(0.66, Qt.GlobalColor.red)
+            self.scale_map.setMode(qwt.QwtLinearColorMap.FixedColors)
+        self.ScaleWidget.setColorMap(self.scale_interval, self.scale_map)
+        self.ScaleWidget.setColorBarEnabled(True)
+        self.ScaleWidget.setColorBarWidth(30)
+        self.ScaleWidget.setBorderDist(10, 10)
+
+        # set default values
+        self.setColorRange(0, self.module.range_max)
+        self.checkBoxValues.setChecked(self.module.show_values)
+
+        # actions
+        # self.connect(self.comboBoxRange, Qt.SIGNAL("editTextChanged(QString)"), self._rangeChanged)
+        self.comboBoxRange.editTextChanged.connect(self._rangeChanged)
+
+        # self.connect(self.checkBoxValues, Qt.SIGNAL("stateChanged(int)"), self._showvalues_changed)
+        self.checkBoxValues.stateChanged.connect(self._showvalues_changed)
+
+        # self.connect(self.module, Qt.SIGNAL('update(PyQt_PyObject)'), self._updateValues)
+        self.module.update.connect(self._updateValues)
+
+    def _rangeChanged(self, rrange):
+        """
+        SIGNAL range combo box value has changed
+        @param range: new range value in KOhm
+        """
+        # validate range
+        valid = self.comboBoxRange.validator().validate(rrange, 0)[0]
+        if valid != QValidator.State.Acceptable:
+            return
+            # use new range
+        newrange = int(rrange)
+
+        self.setColorRange(0, newrange)
+        self.module.range_max = newrange
+        self._updateValues(self.data)
+        self.module.sendColorRange()
+
+    def setColorRange(self, cmin, cmax):
+        """
+        Create new color range for the scale widget
+        """
+        self.scale_interval.setMaxValue(cmax)
+        self.scale_interval.setMinValue(cmin)
+        self.ScaleWidget.setColorMap(self.scale_interval, self.scale_map)
+        self.ScaleWidget.setScaleDiv(self.scale_engine.divideScale(self.scale_interval.minValue(), self.scale_interval.maxValue(), 5, 2))
+
+    def _showvalues_changed(self, state):
+        """
+        SIGNAL show values radio button clicked
+        """
+        self.module.show_values = (state == Qt.CheckState.Checked)
+        self._updateValues(self.data)
+
+    def _updateValues(self, data):
+        """
+        SIGNAL send from impedance module to update cell values
+        @param data: EEG_DataBlock
+        """
+        if data is None:
+            return
+        # keep the last data block
+        self.data = copy.deepcopy(data)
+
+        # check for an outdated impedance structure
+        if len(data.impedances) > 0 or len(data.channel_properties) != len(self.params.channel_properties):
+            print("outdated impedance structure received!")
+            return
+
+        cc = self.tableWidgetValues.columnCount()
+        rc = self.tableWidgetValues.rowCount() - 1
+        # EEG electrodes
+        gndImpedance = None
+        impCount = 0
+        for idx, ch in enumerate(data.channel_properties):
+            if (ch.enable or ch.isReference) and (ch.input > 0) and (ch.input <= rc * cc) and (
+                    ch.inputgroup == ChannelGroup.EEG):
+                impCount += 1
+                row = (ch.input - 1) / cc
+                col = (ch.input - 1) % cc
+                item = self.tableWidgetValues.item(row, col)
+
+                # channel has a data impedance value?
+                if self.params.eeg_channels[idx, ImpedanceIndex.DATA] == 1:
+                    # data channel value
+                    value, color = self._getValueText(data.eeg_channels[idx, ImpedanceIndex.DATA])
+                    item.setBackgroundColor(color)
+                    if self.module.show_values:
+                        item.setText("%s\n%s" % (item.label, value))
+                    else:
+                        item.setText(item.label)
+
+                # channel has a reference impedance value?
+                if self.params.eeg_channels[idx, ImpedanceIndex.REF] == 1:
+                    row = ch.input / cc
+                    col = ch.input % cc
+                    item = self.tableWidgetValues.item(row, col)
+                    # reference channel value
+                    value, color = self._getValueText(data.eeg_channels[idx, ImpedanceIndex.REF])
+                    item.setBackgroundColor(color)
+                    if self.module.show_values:
+                        item.setText("%s\n%s" % (item.label, value))
+                    else:
+                        item.setText(item.label)
+
+                # channel has a GND impedance value?
+                if gndImpedance is None and self.params.eeg_channels[idx, ImpedanceIndex.GND] == 1:
+                    gndImpedance = data.eeg_channels[idx, ImpedanceIndex.GND]
+
+        # GND electrode, take the value of the first EEG electrode
+        item = self.tableWidgetValues.item(rc, 0)
+        if gndImpedance is None:
+            item.setText("")
+            item.setBackgroundColor(Qt.GlobalColor.white)
+        else:
+            value, color = self._getValueText(gndImpedance)
+            item.setBackgroundColor(color)
+            if self.module.show_values:
+                item.setText("%s\n%s" % ("GND", value))
+            else:
+                item.setText("GND")
+
+    def _getValueText(self, impedance):
+        """ evaluate the impedance value and get the text and color for display
+        @return: text and color
+        """
+        if impedance > CHAMP_IMP_INVALID:
+            valuetext = "disconnected"
+            color = QColor(128, 128, 128)
+        else:
+            v = impedance / 1000.0
+            if impedance == CHAMP_IMP_INVALID:
+                valuetext = "out of range"
+            else:
+                valuetext = "%.0f" % v
+            color = self.ScaleWidget.colorMap().color(self.ScaleWidget.colorBarInterval(), v)
+        return valuetext, color
+
+    def updateLabels(self, params):
+        """
+        Update cell labels
+        """
+        # copy channel configuration
+        self.params = copy.deepcopy(params)
+
+        # update cells
+        cc = self.tableWidgetValues.columnCount()
+        rc = self.tableWidgetValues.rowCount() - 1
+        # reset items
+        for row in range(rc):
+            for col in range(cc):
+                item = self.tableWidgetValues.item(row, col)
+                item.setText("")
+                item.label = ""
+                item.setBackgroundColor(Qt.GlobalColor.white)
+        # set channel labels
+        for idx, ch in enumerate(self.params.channel_properties):
+            if (ch.enable or ch.isReference) and (ch.input > 0) and (ch.input <= rc * cc) and (
+                    ch.inputgroup == ChannelGroup.EEG):
+                row = (ch.input - 1) / cc
+                col = (ch.input - 1) % cc
+                # channel has a reference impedance value?
+                if self.params.eeg_channels[idx, ImpedanceIndex.REF] == 1:
+                    # prefix the channel name
+                    name = ch.name + " " + ImpedanceIndex.Name[ImpedanceIndex.DATA]
+                    self._setLabelText(row, col, name)
+                    # put the reference values at the following table item, if possible
+                    name = ch.name + " " + ImpedanceIndex.Name[ImpedanceIndex.REF]
+                    row = ch.input / cc
+                    col = ch.input % cc
+                    self._setLabelText(row, col, name)
+                else:
+                    self._setLabelText(row, col, ch.name)
+
+    def _setLabelText(self, row, col, text):
+        item = self.tableWidgetValues.item(row, col)
+        item.setText(text)
+        item.setBackgroundColor(QColor(128, 128, 128))
+        item.label = text
+
+    def reject(self):
+        """
+        ESC key pressed, Dialog want's close, just ignore it
+        """
+        return
 
 
 if __name__ == "__main__":

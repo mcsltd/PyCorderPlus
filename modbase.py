@@ -662,7 +662,6 @@ class ModuleBase(QObject):
             if data is not None:
                 data.performance_timer_max = max(data.performance_timer_max, wt)
                 data.performance_timer += wt
-                # for idx, receiver in enumerate(self._receivers):
                 for idx, receiver in enumerate(reversed(self._receivers)):
                     if idx == 0:
                         receiver._transmit_data(data)

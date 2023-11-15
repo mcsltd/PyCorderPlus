@@ -664,6 +664,44 @@ class AMP_ActiChamp(ModuleBase):
         eeg = copy.copy(self.eeg_data)
         return eeg
 
+    def process_update(self, params):
+        """
+        Prepare channel properties and propagate update to all connected receivers
+        """
+        # update device sampling rate and get new configuration
+        try:
+            self.amp.readConfiguration(self.sample_rate['base'])
+        except Exception as e:
+            # self.send_exception(e)
+            pass
+        # indicate amplifier simulation
+        if self.amp.getEmulationMode() > 0:
+            self.online_cfg.groupBoxMode.setTitle("Amplifier SIMULATION")
+        else:
+            self.online_cfg.groupBoxMode.setTitle("Amplifier")
+
+        # create channel selection maps
+        if AMP_MONTAGE:
+            # self._create_channel_selection()
+            # self.send_event(ModuleEvent(self._object_name,
+            #                             EventType.STATUS,
+            #                             info="%d ch" % (len(self.channel_indices)),
+            #                             status_field="Channels"))
+            pass
+        else:
+            self._create_all_channel_selection()
+            # try:
+            #     self.inputDevices.process_update(self.eeg_data)
+            # except Exception as e:
+            #     self.send_exception(e)
+
+        # send current status as event
+        # self.send_event(ModuleEvent(self._object_name,
+        #                             EventType.STATUS,
+        #                             info="%.0f Hz" % self.eeg_data.sample_rate,
+        #                             status_field="Rate"))
+        return copy.copy(self.eeg_data)
+
 
 """
 Amplifier module online GUI.
