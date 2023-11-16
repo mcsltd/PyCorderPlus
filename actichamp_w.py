@@ -657,7 +657,7 @@ class ActiChamp:
             if len(ini.read(filename)) > 0:
                 emulation = ini.getint("Main", "Emulation")
                 if emulation != 0:
-                    modules = ini.getint("Emulation", "Model") / 32
+                    modules = int(ini.getint("Emulation", "Model") / 32)
                 try:
                     self.enablePllConfiguration = ini.getint("Main", "EnablePllConfiguration") != 0
                 except:
