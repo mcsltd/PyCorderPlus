@@ -55,7 +55,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # connect modules
         for idx_vertical in range(len(self.modules) - 1):
-            print(self.modules[idx_vertical])
             self.modules[idx_vertical].add_receiver(self.modules[idx_vertical + 1])
 
         # get the top module

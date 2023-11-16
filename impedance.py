@@ -98,7 +98,7 @@ class IMP_Display(ModuleBase):
                         self.impDialog = DlgImpedance(self, topLevelWidgets[0])
                     else:
                         self.impDialog = DlgImpedance(self)
-                self.impDialog.setWindowFlags(Qt.ToolBarArea.Tool)
+                self.impDialog.setWindowFlags(Qt.WindowType.Tool)
                 self.impDialog.show()
                 self.impDialog.updateLabels(self.params)
             else:
@@ -235,7 +235,6 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         self.tableWidgetValues.setColumnCount(cc)
         self.tableWidgetValues.setRowCount(rc + 1)
         self.tableWidgetValues.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        # self.tableWidgetValues.horizontalHeader().setDefaultAlignment(Qt.Qt.Alignment(Qt.Qt.AlignCenter))
         self.tableWidgetValues.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.tableWidgetValues.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tableWidgetValues.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -265,8 +264,6 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         self.tableWidgetValues.setItem(rc, 0, item)
         self.defaultColor = item.background().color()
 
-        print(type(self.defaultColor))
-
         # set range list
         self.comboBoxRange.clear()
         self.comboBoxRange.addItem("15")
@@ -284,7 +281,7 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         # setup color scale
         self.linearscale = False
         self.scale_engine = qwt.scale_engine.QwtLinearScaleEngine()
-        self.scale_interval = qwt.QwtDoubleInterval(0, self.module.range_max)
+        self.scale_interval = qwt.QwtInterval(0, self.module.range_max)
         self.scale_map = qwt.QwtLinearColorMap(Qt.GlobalColor.green, Qt.GlobalColor.red)
         if self.linearscale:
             self.scale_map.addColorStop(0.45, Qt.GlobalColor.yellow)
@@ -370,15 +367,15 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
             if (ch.enable or ch.isReference) and (ch.input > 0) and (ch.input <= rc * cc) and (
                     ch.inputgroup == ChannelGroup.EEG):
                 impCount += 1
-                row = (ch.input - 1) / cc
-                col = (ch.input - 1) % cc
+                row = int((ch.input - 1) / cc)
+                col = int((ch.input - 1) % cc)
                 item = self.tableWidgetValues.item(row, col)
 
                 # channel has a data impedance value?
                 if self.params.eeg_channels[idx, ImpedanceIndex.DATA] == 1:
                     # data channel value
                     value, color = self._getValueText(data.eeg_channels[idx, ImpedanceIndex.DATA])
-                    item.setBackgroundColor(color)
+                    item.setBackground(color)
                     if self.module.show_values:
                         item.setText("%s\n%s" % (item.label, value))
                     else:
@@ -386,12 +383,12 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
 
                 # channel has a reference impedance value?
                 if self.params.eeg_channels[idx, ImpedanceIndex.REF] == 1:
-                    row = ch.input / cc
-                    col = ch.input % cc
+                    row = int(ch.input / cc)
+                    col = int(ch.input % cc)
                     item = self.tableWidgetValues.item(row, col)
                     # reference channel value
                     value, color = self._getValueText(data.eeg_channels[idx, ImpedanceIndex.REF])
-                    item.setBackgroundColor(color)
+                    item.setBackground(color)
                     if self.module.show_values:
                         item.setText("%s\n%s" % (item.label, value))
                     else:
@@ -405,10 +402,10 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         item = self.tableWidgetValues.item(rc, 0)
         if gndImpedance is None:
             item.setText("")
-            item.setBackgroundColor(Qt.GlobalColor.white)
+            item.setBackground(Qt.GlobalColor.white)
         else:
             value, color = self._getValueText(gndImpedance)
-            item.setBackgroundColor(color)
+            item.setBackground(color)
             if self.module.show_values:
                 item.setText("%s\n%s" % ("GND", value))
             else:
@@ -440,19 +437,20 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         # update cells
         cc = self.tableWidgetValues.columnCount()
         rc = self.tableWidgetValues.rowCount() - 1
+
         # reset items
         for row in range(rc):
             for col in range(cc):
                 item = self.tableWidgetValues.item(row, col)
                 item.setText("")
                 item.label = ""
-                item.setBackgroundColor(Qt.GlobalColor.white)
+                item.setBackground(Qt.GlobalColor.white)
         # set channel labels
         for idx, ch in enumerate(self.params.channel_properties):
             if (ch.enable or ch.isReference) and (ch.input > 0) and (ch.input <= rc * cc) and (
                     ch.inputgroup == ChannelGroup.EEG):
-                row = (ch.input - 1) / cc
-                col = (ch.input - 1) % cc
+                row = int((ch.input - 1) / cc)
+                col = int((ch.input - 1) % cc)
                 # channel has a reference impedance value?
                 if self.params.eeg_channels[idx, ImpedanceIndex.REF] == 1:
                     # prefix the channel name
@@ -460,8 +458,8 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
                     self._setLabelText(row, col, name)
                     # put the reference values at the following table item, if possible
                     name = ch.name + " " + ImpedanceIndex.Name[ImpedanceIndex.REF]
-                    row = ch.input / cc
-                    col = ch.input % cc
+                    row = int(ch.input / cc)
+                    col = int(ch.input % cc)
                     self._setLabelText(row, col, name)
                 else:
                     self._setLabelText(row, col, ch.name)
@@ -469,7 +467,7 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
     def _setLabelText(self, row, col, text):
         item = self.tableWidgetValues.item(row, col)
         item.setText(text)
-        item.setBackgroundColor(QColor(128, 128, 128))
+        item.setBackground(QColor(128, 128, 128))
         item.label = text
 
     def reject(self):
@@ -477,6 +475,17 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         ESC key pressed, Dialog want's close, just ignore it
         """
         return
+
+    def closeEvent(self, event):
+        """ Dialog want's close, send stop request to main window
+        """
+        self.setParent(None)
+        self.disconnect(self.module.update.connect(self._updateValues))
+        if self.sender() is None:
+            # self.module.send_event(ModuleEvent(self.module._object_name, EventType.COMMAND, "Stop"))
+            pass
+        event.accept()
+
 
 
 if __name__ == "__main__":
