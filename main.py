@@ -13,6 +13,7 @@ Import and instantiate recording modules.
 """
 from amplifier import AMP_ActiChamp, Receiver
 from display import DISP_Scope
+from impedance import IMP_Display
 
 
 def InstantiateModules():
@@ -25,6 +26,7 @@ def InstantiateModules():
     # test modules for control amplifier
     modules = [
         AMP_ActiChamp(),
+        IMP_Display(),
         DISP_Scope(instance=0),
         # Receiver()
     ]
@@ -82,10 +84,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
 
     def configurationClicked(self):
-        ''' Configuration button clicked
+        """ Configuration button clicked
         - Open configuration dialog and add configuration panes for each module in the
         module chain, if available
-        '''
+        """
         dlg = DlgConfiguration()
         for module in flatten(self.modules):
             pane = module.get_configuration_pane()

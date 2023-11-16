@@ -343,7 +343,7 @@ class ModuleBase(QObject):
     """ Base class for all recording modules
     """
 
-    def __init__(self, usethread=False, queuesize=20, name="ModuleBase", instance=0):
+    def __init__(self, usethread=True, queuesize=20, name="ModuleBase", instance=0):
         ''' Create a new recording module object
         @param usethread: true if data transfer should be handled internally by worker thread
         @param queuesize: size of receiver input queue in elements
@@ -662,7 +662,6 @@ class ModuleBase(QObject):
             if data is not None:
                 data.performance_timer_max = max(data.performance_timer_max, wt)
                 data.performance_timer += wt
-                # for idx, receiver in enumerate(self._receivers):
                 for idx, receiver in enumerate(reversed(self._receivers)):
                     if idx == 0:
                         receiver._transmit_data(data)
