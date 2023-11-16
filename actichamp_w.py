@@ -981,14 +981,14 @@ class ActiChamp:
         return base, div
 
     def LedTest(self, step):
-        ''' Toggle active electrode LEDs
+        """ Toggle active electrode LEDs
         @param step: 0 = switch off all electrode LEDs, reset index
                      1 = set next electrode to green
                      2 = set next electrode to red
                      11 = set all electrodes to green
                      12 = set all electrodes to red
         @return: TRUE if last electrode index reached
-        '''
+        """
         ledcount = self.properties.CountEeg + 1
         led_array = (ctypes.c_int * ledcount)()
         led_array[:] = [0] * len(led_array)
