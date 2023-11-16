@@ -43,8 +43,6 @@ from PyQt6.QtWidgets import (QFrame,
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 
-
-
 from modbase import *
 from actichamp_w import *
 
@@ -522,8 +520,8 @@ class AMP_ActiChamp(ModuleBase):
         if self.recording_mode == CHAMP_MODE_IMPEDANCE:
             return self.process_impedance()
 
-        # ToDo: if self.recording_mode == CHAMP_MODE_LED_TEST:
-        #     return self.process_led_test()
+        if self.recording_mode == CHAMP_MODE_LED_TEST:
+            return self.process_led_test()
 
         if self.amp.BlockingMode:
             self._thLock.release()
@@ -663,6 +661,30 @@ class AMP_ActiChamp(ModuleBase):
         # put it into the receiver queues
         eeg = copy.copy(self.eeg_data)
         return eeg
+
+    def process_led_test(self):
+        """ toggle LEDs on active electrodes
+        and return no eeg data
+        """
+        # dummy read data
+        d, disconnected = self.amp.read(self.channel_indices, len(self.eeg_indices), len(self.aux_indices))
+
+        # toggle LEDs twice per second
+        t = time.process_time()
+        if (t - self.impedance_timer) < 0.5:
+            return None
+        self.impedance_timer = t
+
+        # toggle all LEDs between off, green and red
+        if self.test_counter % 3 == 0:
+            self.amp.LedTest(0)
+        elif self.test_counter % 3 == 1:
+            self.amp.LedTest(11)
+        else:
+            self.amp.LedTest(12)
+
+        self.test_counter += 1
+        return None
 
     def process_update(self, params):
         """
@@ -911,7 +933,6 @@ class _DeviceConfigurationPane(QFrame):
             self._updateAvailableChannels()
 
     def _configurationDataChanged(self):
-        # self.emit(Qt.SIGNAL('dataChanged()'))
         self.dataChanged.emit()
 
     def _updateAvailableChannels(self):
