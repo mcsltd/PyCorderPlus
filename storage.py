@@ -32,9 +32,13 @@ B{Revision:} $LastChangedRevision: 206 $
 """
 import time
 
-from modbase import *
+
 import platform
 import ctypes as ct
+
+from PyQt6.QtWidgets import QMessageBox
+
+from modbase import *
 
 """
 Storage module.
@@ -328,10 +332,72 @@ class StorageVision(ModuleBase):
         return self.data
 
     def process_stop(self):
-        pass
+        ''' Stop data acquisition
+                '''
+        self._close_recording()
+        # ToDo: disable recording button
+        # self.online_cfg.pushButtonRecord.setEnabled(False)
 
     def process_update(self, params):
-        pass
+        """
+        Calculate recording parameters for updated channels
+        """
+        # copy settings
+        self.params = copy.copy(params)
+        if params.recording_mode == RecordingMode.IMPEDANCE:
+            self.last_impedance_config = copy.copy(params)
+        numchannels = len(params.channel_properties)
+        self.samples_per_second = numchannels * params.sample_rate
+        return params
+
+    def process_query(self, command):
+        ''' Evaluate query commands.
+        @param command: command string
+        @return: True if user confirms to stop recording to file
+        '''
+        if self.data_file == 0:
+            return True
+        if command == "Stop":
+            ret = QMessageBox.question(
+                None,
+                "PyCorder",
+                "Stop Recording?",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel
+            )
+            if ret != QMessageBox.StandardButton.Ok:
+                return False
+        if command == "RemoteStop":
+            return False
+        return True
+
+    def process_event(self, event):
+        ''' Handle events from attached receivers
+        @param event: ModuleEvent
+        '''
+        # Get info of all connected modules for header file comment
+        if event.type == EventType.STATUS and event.status_field == "ModuleInfo":
+            self.moduledescription = event.info
+
+        # handle remote commands
+        if event.type == EventType.COMMAND:
+            # check for start, cmd_value contains the EEG filename without extension
+            if event.info == "StartSaving":
+                # quit if recording is already active or if we are in impendance mode
+                if self.data_file != 0 or self.params.recording_mode == RecordingMode.IMPEDANCE:
+                    return
+                try:
+                    self.file_name = self._get_unique_filename(event.cmd_value)
+                    if self._prepare_recording():
+                        # self.online_cfg.set_filename(os.path.split(self.file_name)[0],
+                        #                              os.path.split(self.file_name)[1])
+                        pass
+                except Exception as e:
+                    # self.send_exception(e, severity=ErrorSeverity.STOP)
+                    pass
+
+            # check for stop
+            if event.info == "StopSaving":
+                self._close_recording()
 
 
 """
