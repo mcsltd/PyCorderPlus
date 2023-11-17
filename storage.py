@@ -35,10 +35,15 @@ import time
 import platform
 import ctypes as ct
 
-from PyQt6.QtWidgets import QMessageBox, QFileDialog
+from PyQt6.QtWidgets import QMessageBox, QFileDialog, QFrame
 from PyQt6.QtCore import QDir, QFile, Qt
+from PyQt6.QtGui import QPalette, QColor
 
 from modbase import *
+
+from res import frmStorageVisionOnline
+from res import frmStorageVisionConfig
+
 
 """
 Storage module.
@@ -809,8 +814,121 @@ Storage module online GUI.
 """
 
 
-class _OnlineCfgPane:
-    pass
+class _OnlineCfgPane(QFrame, frmStorageVisionOnline.Ui_frmStorageVisionOnline):
+    """
+    Vision Storage Module online configuration pane
+    """
+
+    def __init__(self, module, *args):
+        ''' Constructor
+        @param module: parent module
+        '''
+        super().__init__()
+        self.setupUi(self)
+        self.module = module
+
+        # set default values
+        self.pushButtonRecord.setEnabled(False)
+        self.set_recording_state(False)
+
+        self.filename = ""
+        self.pathname = ""
+
+        # start display update timer
+        self.startTimer(1000)
+
+    def set_filename(self, path, file, time=0):
+        """ Show pathname, filename and optional recording time
+        @param path: recording path name
+        @param file: recording file name
+        @param time: time of data written to file in seconds
+        """
+        self.pathname = path
+        self.filename = file
+        if time > 0:
+            days, hours, minutes, seconds = self.get_DHMS(time)
+            if days == 0:
+                timestring = "  %02d:%02d:%02d [h:m:s]" % (hours, minutes, seconds)
+            else:
+                timestring = "  %d:%02d:%02d:%02d [d:h:m:s]" % (days, hours, minutes, seconds)
+        else:
+            timestring = ""
+        self.lineEditPath.setText(path)
+        self.lineEditFile.setText(file + timestring)
+
+    def timerEvent(self, e):
+        """ Display update timer event
+        """
+        # calculate available disk size
+        path = self.lineEditPath.text()
+        if len(path) > 0:
+            free, total = self.module.get_free_space(path)
+            if total > 0 and free > 0:
+                ratio = free * 100.0 / total
+            else:
+                ratio = 0
+            self.progressBar.setValue(ratio)
+            self.module.check_free_space(free)
+        else:
+            free = total = 0
+            self.progressBar.setValue(0)
+
+        # estimate required size in Byte per second
+        bps = self.module.samples_per_second * np.zeros(1, np.float32).dtype.itemsize
+        if bps > 0:
+            if free > 0:
+                seconds = free / bps
+            else:
+                seconds = 0
+            # Get the days, hours, minutes:
+            days, hours, minutes, seconds = self.get_DHMS(seconds)
+            self.lineEditDiskSpace.setText("%d:%02d:%02d" % (days, hours, minutes))
+        else:
+            self.lineEditDiskSpace.setText("--:--:--")
+
+        # calculate the time of data written to file
+        if (self.module.params is not None) and (self.module.params.sample_rate > 0):
+            seconds = self.module.samples_written / self.module.params.sample_rate
+            self.set_filename(self.pathname, self.filename, time=seconds)
+
+    def get_DHMS(self, seconds):
+        """ Get days, hours, minutes and seconds from seconds
+        @param seconds: total number of seconds
+        @return: tuple (Days, Hours, Minutes, Seconds)
+        """
+        MINUTE = 60
+        HOUR = MINUTE * 60
+        DAY = HOUR * 24
+        days = int(seconds / DAY)
+        hours = int((seconds % DAY) / HOUR)
+        minutes = int((seconds % HOUR) / MINUTE)
+        seconds = int(seconds % MINUTE)
+        return days, hours, minutes, seconds
+
+    def set_recording_state(self, on):
+        """
+        Update display elements to reflect the recording state
+        """
+        if on:
+            self.progressBar.setEnabled(True)
+            palette = self.lineEditFile.palette()
+            if self.module.write_error:
+                palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.red)
+            else:
+                palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.green)
+            self.lineEditFile.setPalette(palette)
+            self.pushButtonRecord.setChecked(True)
+            self.pushButtonRecord.setText("Stop Recording")
+        else:
+            self.progressBar.setEnabled(False)
+            palette = self.lineEditFile.palette()
+            if self.module.write_error:
+                palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.red)
+            else:
+                palette.setColor(QPalette.ColorRole.Base, QColor(240, 240, 240))
+            self.lineEditFile.setPalette(palette)
+            self.pushButtonRecord.setChecked(False)
+            self.pushButtonRecord.setText("Start Recording")
 
 
 """
