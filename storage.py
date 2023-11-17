@@ -37,7 +37,7 @@ import ctypes as ct
 
 from PyQt6.QtWidgets import QMessageBox, QFileDialog, QFrame
 from PyQt6.QtCore import QDir, QFile, Qt
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QIntValidator, QDoubleValidator
 
 from modbase import *
 
@@ -132,11 +132,11 @@ class StorageVision(ModuleBase):
         self.missing_interval = 0
         self.missing_cumulated = 0
         self.next_samplecounter = -2
-        # ToDo: enable recording button
-        # if self.params.recording_mode != RecordingMode.IMPEDANCE:
-        #     self.online_cfg.pushButtonRecord.setEnabled(True)
-        # else:
-        #     self.online_cfg.pushButtonRecord.setEnabled(False)
+        # enable recording button
+        if self.params.recording_mode != RecordingMode.IMPEDANCE:
+            self.online_cfg.pushButtonRecord.setEnabled(True)
+        else:
+            self.online_cfg.pushButtonRecord.setEnabled(False)
 
     def process_input(self, datablock):
         """
@@ -327,7 +327,7 @@ class StorageVision(ModuleBase):
                 print(f"Failed to close recording files: {e}")
             self.data_file = 0
             self.data_file = 0
-            # ToDo: self.online_cfg.set_recording_state(False)
+            self.online_cfg.set_recording_state(False)
         self._thLock.release()
 
     def process_output(self):
@@ -341,8 +341,8 @@ class StorageVision(ModuleBase):
         Stop data acquisition
         """
         self._close_recording()
-        # ToDo: disable recording button
-        # self.online_cfg.pushButtonRecord.setEnabled(False)
+        # disable recording button
+        self.online_cfg.pushButtonRecord.setEnabled(False)
 
     def process_update(self, params):
         """
@@ -377,9 +377,9 @@ class StorageVision(ModuleBase):
         return True
 
     def process_event(self, event):
-        ''' Handle events from attached receivers
+        """ Handle events from attached receivers
         @param event: ModuleEvent
-        '''
+        """
         # Get info of all connected modules for header file comment
         if event.type == EventType.STATUS and event.status_field == "ModuleInfo":
             self.moduledescription = event.info
@@ -394,9 +394,8 @@ class StorageVision(ModuleBase):
                 try:
                     self.file_name = self._get_unique_filename(event.cmd_value)
                     if self._prepare_recording():
-                        # self.online_cfg.set_filename(os.path.split(self.file_name)[0],
-                        #                              os.path.split(self.file_name)[1])
-                        pass
+                        self.online_cfg.set_filename(os.path.split(self.file_name)[0],
+                                                     os.path.split(self.file_name)[1])
                 except Exception as e:
                     # self.send_exception(e, severity=ErrorSeverity.STOP)
                     pass
@@ -406,8 +405,8 @@ class StorageVision(ModuleBase):
                 self._close_recording()
 
     def _prepare_recording(self):
-        ''' Create and prepare EEG data, header and marker file
-        '''
+        """ Create and prepare EEG data, header and marker file
+        """
         if self.file_name is not None:
             # check for minimum available disk space
             if self.get_free_space(self.file_name)[0] < 0:
@@ -513,7 +512,7 @@ class StorageVision(ModuleBase):
                             h += u"%3d %s: %s" % (ch.input, ch.name, impedanceText) + crlf
 
                     # GND electrode
-                    if gndImpedance != None:
+                    if gndImpedance is not None:
                         val = self._getImpedanceValueText(gndImpedance)
                         h += u"GND: %s" % val + crlf
 
@@ -562,7 +561,7 @@ class StorageVision(ModuleBase):
                 self._thLock.release()
 
             # show recording state
-            # self.online_cfg.set_recording_state(True)
+            self.online_cfg.set_recording_state(True)
 
             # send status to application
             # self.send_event(ModuleEvent(self._object_name,
@@ -616,10 +615,11 @@ class StorageVision(ModuleBase):
         return newfilename
 
     def get_free_space(self, path):
-        ''' Get the total and free available disk space
+        """
+        Get the total and free available disk space
         @param path: complete data file path
         @return: tuple folder/drive free and total space (in bytes)
-        '''
+        """
         if platform.system() == 'Windows':
             folder = os.path.splitdrive(path)[0]
             free_bytes = ct.c_ulonglong(0)
@@ -638,9 +638,10 @@ class StorageVision(ModuleBase):
             return free, total_bytes
 
     def _getImpedanceValueText(self, impedance):
-        ''' evaluate the impedance value and get the text for the header file
+        """
+        evaluate the impedance value and get the text for the header file
         @return: text
-        '''
+        """
         if impedance > CHAMP_IMP_INVALID:
             valuetext = "Disconnected!"
         else:
@@ -652,15 +653,16 @@ class StorageVision(ModuleBase):
         return valuetext
 
     def set_recording_file(self):
-        ''' SIGNAL recording button clicked: Select data file and prepare recording
-        '''
+        """
+        SIGNAL recording button clicked: Select data file and prepare recording
+        """
         try:
             # is recording active?
             if self.data_file != 0:
                 if self.process_query("Stop"):
                     self._close_recording()
-                # else:
-                #     self.online_cfg.set_recording_state(True)
+                else:
+                    self.online_cfg.set_recording_state(True)
             elif self.params.recording_mode != RecordingMode.IMPEDANCE:
                 dlg = QFileDialog()
                 dlg.setFileMode(QFileDialog.FileMode.AnyFile)
@@ -694,11 +696,11 @@ class StorageVision(ModuleBase):
                         if ret != QMessageBox.StandardButton.Ok:
                             ok = False
 
-                #     if ok and self._prepare_recording():
-                #         self.online_cfg.set_filename(os.path.split(self.file_name)[0],
-                #                                      os.path.split(self.file_name)[1])
-                # if not ok:
-                #     self.online_cfg.set_recording_state(False)
+                    if ok and self._prepare_recording():
+                        self.online_cfg.set_filename(os.path.split(self.file_name)[0],
+                                                     os.path.split(self.file_name)[1])
+                if not ok:
+                    self.online_cfg.set_recording_state(False)
         except Exception as e:
             self.send_exception(e, severity=ErrorSeverity.STOP)
 
@@ -740,13 +742,13 @@ class StorageVision(ModuleBase):
         # create online configuration pane
         self.online_cfg = _OnlineCfgPane(self)
         # connect recording button
-        # self.connect(self.online_cfg.pushButtonRecord, Qt.SIGNAL("clicked(bool)"), self.set_recording_file)
+        self.online_cfg.pushButtonRecord.clicked.connect(self.set_recording_file)
         return self.online_cfg
 
     def get_configuration_pane(self):
-        ''' Get the configuration pane if available
+        """ Get the configuration pane if available
         - Qt widgets are not reusable, so we have to create it every time
-        '''
+        """
         config = _ConfigurationPane(self)
         return config
 
@@ -820,9 +822,9 @@ class _OnlineCfgPane(QFrame, frmStorageVisionOnline.Ui_frmStorageVisionOnline):
     """
 
     def __init__(self, module, *args):
-        ''' Constructor
+        """ Constructor
         @param module: parent module
-        '''
+        """
         super().__init__()
         self.setupUi(self)
         self.module = module
@@ -936,5 +938,71 @@ Storage module configuration GUI.
 """
 
 
-class _ConfigurationPane:
-    pass
+class _ConfigurationPane(QFrame, frmStorageVisionConfig.Ui_frmStorageVisionConfig):
+    """
+    Vision Storage configuration pane
+    """
+    def __init__(self, storage, *args):
+        """ Constructor
+        @param storage: parent module
+        """
+        super().__init__()
+        self.setupUi(self)
+
+        # set validators
+        validator = QIntValidator(1, 50, self)
+        self.lineEditCounterSize.setValidator(validator)
+
+        validator2 = QDoubleValidator(0.01, 500.0, 2, self)
+        self.lineEditSpace.setValidator(validator2)
+
+        # setup content
+        self.storage = storage
+
+        self.lineEditFolder.setText(storage.default_path)
+        self.lineEditPrefix.setText(storage.default_prefix)
+        self.lineEditCounterSize.setText(str(storage.default_numbersize))
+        self.checkBoxAutoFile.setChecked(storage.default_autoname)
+        self.lineEditSpace.setText(str(storage.min_disk_space))
+        self._showExample()
+
+        # actions
+        self.lineEditFolder.editingFinished.connect(self._contentChanged)
+        self.lineEditPrefix.editingFinished.connect(self._contentChanged)
+        self.lineEditCounterSize.editingFinished.connect(self._contentChanged)
+        self.checkBoxAutoFile.clicked.connect(self._contentChanged)
+        self.pushButtonBrowse.clicked.connect(self._browse)
+        self.lineEditSpace.editingFinished.connect(self._contentChanged)
+
+    def _contentChanged(self):
+        """
+        Update parent object vars
+        """
+        self.storage.default_path = self.lineEditFolder.displayText()
+        self.storage.default_prefix = self.lineEditPrefix.displayText().lstrip()
+        self.lineEditPrefix.setText(self.storage.default_prefix)
+        self.storage.default_numbersize = self.lineEditCounterSize.displayText().toInt()[0]
+        self.storage.default_autoname = self.checkBoxAutoFile.isChecked()
+        self.storage.min_disk_space = self.lineEditSpace.displayText().toDouble()[0]
+        self._showExample()
+
+    def _browse(self):
+        """
+        Browse for the default data folder
+        """
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.DirectoryOnly)
+        dlg.setOption(QFileDialog.Option.ShowDirsOnly)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        if dlg.exec():
+            files = dlg.selectedFiles()
+            file_name = files[0]
+            self.lineEditFolder.setText(file_name)
+            self._contentChanged()
+
+    def _showExample(self):
+        """
+        Show auto file name example
+        """
+        example = "%s%0*d.eeg" % (self.storage.default_prefix, self.storage.default_numbersize, 1)
+        self.labelExample.setText(example)
