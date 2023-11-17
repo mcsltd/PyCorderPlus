@@ -32,11 +32,11 @@ B{Revision:} $LastChangedRevision: 206 $
 """
 import time
 
-
 import platform
 import ctypes as ct
 
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox, QFileDialog
+from PyQt6.QtCore import QDir, QFile, Qt
 
 from modbase import *
 
@@ -123,7 +123,7 @@ class StorageVision(ModuleBase):
         Start data acquisition
         """
         # reset sample counter check
-        self.missing_timer = time.clock()
+        self.missing_timer = time.process_time()
         self.missing_interval = 0
         self.missing_cumulated = 0
         self.next_samplecounter = -2
@@ -167,12 +167,13 @@ class StorageVision(ModuleBase):
             # print("samples missing = %i, interval = %i, cumulated = %i"%(missing_samples, self.missing_interval, self.missing_cumulated))
             error = "%d samples missing" % missing_samples
             if self.missing_interval > 2:
-                self.send_event(
-                    ModuleEvent(self._object_name, EventType.ERROR, info=error, severity=ErrorSeverity.NOTIFY))
+                # self.send_event(
+                #     ModuleEvent(self._object_name, EventType.ERROR, info=error, severity=ErrorSeverity.NOTIFY)
+                # )
                 self.missing_interval = 0
                 self.missing_cumulated = 0
-            else:
-                self.send_event(ModuleEvent(self._object_name, EventType.LOG, info=error))
+            # else:
+            #     # self.send_event(ModuleEvent(self._object_name, EventType.LOG, info=error))
             self.missing_timer = time.process_time()
         else:
             missing_samples = 0
@@ -305,7 +306,7 @@ class StorageVision(ModuleBase):
             except:
                 m += blockdate.strftime(",%Y%m%d%H%M%S%f")
         m += u"\n"
-        self.marker_file.write(m.encode('utf-8'))
+        self.marker_file.write(m)
         self.marker_file.flush()
 
     def _close_recording(self):
@@ -324,7 +325,6 @@ class StorageVision(ModuleBase):
             # ToDo: self.online_cfg.set_recording_state(False)
         self._thLock.release()
 
-
     def process_output(self):
         if not self.dataavailable:
             return None
@@ -332,8 +332,9 @@ class StorageVision(ModuleBase):
         return self.data
 
     def process_stop(self):
-        ''' Stop data acquisition
-                '''
+        """
+        Stop data acquisition
+        """
         self._close_recording()
         # ToDo: disable recording button
         # self.online_cfg.pushButtonRecord.setEnabled(False)
@@ -351,10 +352,10 @@ class StorageVision(ModuleBase):
         return params
 
     def process_query(self, command):
-        ''' Evaluate query commands.
+        """ Evaluate query commands.
         @param command: command string
         @return: True if user confirms to stop recording to file
-        '''
+        """
         if self.data_file == 0:
             return True
         if command == "Stop":
@@ -398,6 +399,409 @@ class StorageVision(ModuleBase):
             # check for stop
             if event.info == "StopSaving":
                 self._close_recording()
+
+    def _prepare_recording(self):
+        ''' Create and prepare EEG data, header and marker file
+        '''
+        if self.file_name is not None:
+            # check for minimum available disk space
+            if self.get_free_space(self.file_name)[0] < 0:
+                # self.online_cfg.set_recording_state(False)
+                path = os.path.split(self.file_name)[0]
+                QMessageBox.critical(None, "Storage",
+                                     "out of disk space (%.2fGB) on %s" % (self.min_disk_space, path))
+                return False
+
+            fname, ext = os.path.splitext(self.file_name)
+            headername = fname + ".vhdr"
+            markername = fname + ".vmrk"
+            crlf = u"\n"
+
+            # create EEG header file
+            try:
+                self.header_file = open(headername, "w")
+                # ToDo: add data from which device the data is being recorded
+                h = u"Brain Vision Data Exchange Header File Version 1.0" + crlf
+                h += u"; Data created by the actiCHamp PyCorder" + crlf + crlf
+
+                # common infos.
+                h += u"[Common Infos]" + crlf
+                h += u"Codepage=UTF-8" + crlf
+                h += u"DataFile=" + os.path.split(self.file_name)[1] + crlf
+                h += u"MarkerFile=" + os.path.split(markername)[1] + crlf
+                h += u"DataFormat=BINARY" + crlf
+                h += u"; Data orientation: MULTIPLEXED=ch1,pt1, ch2,pt1 ..." + crlf
+                h += u"DataOrientation=MULTIPLEXED" + crlf
+                h += u"NumberOfChannels=%d" % (len(self.params.channel_properties)) + crlf
+                h += u"; Sampling interval in microseconds" + crlf
+                usSR = 1000000.0 / self.params.sample_rate
+                if int(usSR) == usSR:
+                    h += u"SamplingInterval=%d" % usSR + crlf
+                else:
+                    h += u"SamplingInterval=%.5f" % usSR + crlf
+                h += crlf
+                h += u"[Binary Infos]" + crlf
+                h += u"BinaryFormat=IEEE_FLOAT_32" + crlf
+                h += crlf
+                h += u"[Channel Infos]" + crlf
+                h += u"; Each entry: Ch<Channel number>=<Name>,<Reference channel name>," + crlf
+                h += u"; <Scaling factor in \"Unit\">,<Unit>, Future extensions.." + crlf
+                h += u"; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
+                h += u"; Commas in channel names are coded as \"\\1\"." + crlf
+
+                # channel configuration
+                ch = 1
+                for channel in self.params.channel_properties:
+                    lbl = channel.name.replace(",", "\\1")
+                    refLabel = channel.refname.replace(",", "\\1")
+                    if len(channel.unit) > 0:
+                        unit = channel.unit
+                    else:
+                        unit = u"µV"
+                    h += u"Ch%d=%s,%s,1.0,%s" % (ch, lbl, refLabel, unit) + crlf
+                    ch += 1
+
+                # recorder info
+                h += crlf
+                h += u"[Comment]" + crlf
+                h += self.moduledescription
+                h += crlf
+
+                # reference channel names
+                h += u"Reference channel: %s" % self.params.ref_channel_name + crlf
+
+                # impedance values if available
+                if self.last_impedance is not None:
+                    h += crlf
+                    h += u"Impedance [KOhm] at %s (recording started at %s)" % (
+                        self.last_impedance.block_time.strftime("%H:%M:%S"),
+                        datetime.datetime.now().strftime("%H:%M:%S")) + crlf
+
+                    # impedance for eeg electrodes
+                    gndImpedance = None
+                    for idx, ch in enumerate(self.last_impedance_config.channel_properties):
+                        if not ((ch.inputgroup == ChannelGroup.EEG) and (ch.enable or ch.isReference)):
+                            continue
+                        valD = ""
+                        valR = ""
+                        # impedance value for data electrode available?
+                        if self.last_impedance_config.eeg_channels[idx, ImpedanceIndex.DATA] == 1:
+                            valD = self._getImpedanceValueText(
+                                self.last_impedance.eeg_channels[idx, ImpedanceIndex.DATA])
+
+                        # impedance value for reference electrode available?
+                        if self.last_impedance_config.eeg_channels[idx, ImpedanceIndex.REF] == 1:
+                            valR = self._getImpedanceValueText(
+                                self.last_impedance.eeg_channels[idx, ImpedanceIndex.REF])
+
+                        if len(valD) and len(valR):
+                            impedanceText = "+%s / -%s" % (valD, valR)
+                        else:
+                            impedanceText = valD
+
+                        # take the first available GND impedance
+                        if gndImpedance is None and self.last_impedance_config.eeg_channels[
+                            idx, ImpedanceIndex.GND] == 1:
+                            gndImpedance = self.last_impedance.eeg_channels[idx, ImpedanceIndex.GND]
+
+                        if len(impedanceText) > 0:
+                            h += u"%3d %s: %s" % (ch.input, ch.name, impedanceText) + crlf
+
+                    # GND electrode
+                    if gndImpedance != None:
+                        val = self._getImpedanceValueText(gndImpedance)
+                        h += u"GND: %s" % val + crlf
+
+                self.header_file.write(h)
+                self.header_file.close()
+
+            except Exception as e:
+                raise ModuleError(self._object_name, "failed to create %s\n%s" % (headername, str(e)))
+
+            # create EEG marker file
+            try:
+                self.marker_file = open(markername, "w")
+                h = u"Brain Vision Data Exchange Marker File, Version 1.0" + crlf
+                h += crlf
+                # common infos.
+                h += u"[Common Infos]" + crlf
+                h += u"Codepage=UTF-8" + crlf
+                h += u"DataFile=" + os.path.split(self.file_name)[1] + crlf
+                h += crlf
+                # Marker infos.
+                h += u"[Marker Infos]" + crlf
+                h += u"; Each entry: Mk<Marker number>=<Type>,<Description>,<Position in data points>," + crlf
+                h += u"; <Size in data points>, <Channel number (0 = marker is related to all channels)>" + crlf
+                h += u"; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
+                h += u"; Commas in type or description text are coded as \"\\1\"." + crlf
+
+                self.marker_file.write(h)
+                self.marker_file.flush()
+                self.marker_counter = 0
+                self.marker_newseg = False
+
+            except Exception as e:
+                self.header_file.close()
+                raise ModuleError(self._object_name, "failed to create %s\n%s" % (markername, str(e)))
+
+            # create EEG data file
+            try:
+                self._thLock.acquire()
+                self.data_file = self.libc._wfopen(self.file_name, u"wb")
+                self.write_error = False
+            except IOError as e:
+                self.header_file.close()
+                self.marker_file.close()
+                raise ModuleError(self._object_name, "failed to create %s" % self.file_name)
+            finally:
+                self._thLock.release()
+
+            # show recording state
+            # self.online_cfg.set_recording_state(True)
+
+            # send status to application
+            # self.send_event(ModuleEvent(self._object_name,
+            #                             EventType.STATUS,
+            #                             info=self.file_name,
+            #                             status_field="Storage"))
+        return True
+
+    def _get_unique_filename(self, filename):
+        """ if file already exists, append the next free number to the filename
+        @param filename: filename without path and extension, has to be unicode
+        @return: fully qualified path and filename for the next, not yet existing eeg file
+        """
+        # get rid of path and extension from filename
+        fnx = os.path.split(filename)[1]
+        fn = os.path.splitext(fnx)[0]
+        # take path from configuration
+        pn = self.default_path
+        eegdir = QDir(pn)
+        if not eegdir.exists():
+            raise Exception("path '%s' does not exist" % pn)
+        eegdir.setFilter(QDir.Filter.Files)
+        eegdir.setNameFilters([u"%s*.eeg" % fn])
+        allfiles = eegdir.entryList()
+        eegdir.setNameFilters([u"%s_*.eeg" % fn])
+        numberedfiles = eegdir.entryList()
+
+        if allfiles.count() == 0:
+            return os.path.join(pn, filename + ".eeg")
+
+        # extract numbers
+        numberedfiles.replaceInStrings(".eeg", "", Qt.CaseSensitivity.CaseInsensitive)
+        numberedfiles.replaceInStrings(fn + "_", "", Qt.CaseSensitivity.CaseInsensitive)
+        numbers = []
+        for f in numberedfiles:
+            num, ok = f.toInt()
+            if ok:
+                numbers.append(num)
+        if len(numbers) > 0:
+            # get the highest number
+            numbers.sort()
+            fnum = numbers[-1] + 1
+        else:
+            fnum = 1
+        newfilename = os.path.join(pn, u"%s_%d.eeg" % (filename, fnum))
+
+        # verify that the file is not yet existing
+        if QFile.exists(newfilename):
+            raise Exception("auto numbering failed, '%s' already exists" % newfilename)
+
+        return newfilename
+
+    def get_free_space(self, path):
+        ''' Get the total and free available disk space
+        @param path: complete data file path
+        @return: tuple folder/drive free and total space (in bytes)
+        '''
+        if platform.system() == 'Windows':
+            folder = os.path.splitdrive(path)[0]
+            free_bytes = ct.c_ulonglong(0)
+            total_bytes = ct.c_ulonglong(0)
+            ct.windll.kernel32.GetDiskFreeSpaceExW(ct.c_wchar_p(folder),
+                                                   ct.pointer(free_bytes),
+                                                   ct.pointer(total_bytes),
+                                                   None)
+            free = free_bytes.value - self.min_disk_space * 1024 ** 3
+            return free, total_bytes.value
+        else:
+            folder = os.path.split(path)[0]
+            diskinfo = os.statvfs(folder)
+            total_bytes = diskinfo.f_blocks * diskinfo.f_bsize
+            free = (diskinfo.f_bavail * diskinfo.f_bsize) - self.min_disk_space * 1024 ** 3
+            return free, total_bytes
+
+    def _getImpedanceValueText(self, impedance):
+        ''' evaluate the impedance value and get the text for the header file
+        @return: text
+        '''
+        if impedance > CHAMP_IMP_INVALID:
+            valuetext = "Disconnected!"
+        else:
+            v = impedance / 1000.0
+            if impedance == CHAMP_IMP_INVALID:
+                valuetext = "Out of Range!"
+            else:
+                valuetext = "%.0f" % v
+        return valuetext
+
+    def set_recording_file(self):
+        ''' SIGNAL recording button clicked: Select data file and prepare recording
+        '''
+        try:
+            # is recording active?
+            if self.data_file != 0:
+                if self.process_query("Stop"):
+                    self._close_recording()
+                # else:
+                #     self.online_cfg.set_recording_state(True)
+            elif self.params.recording_mode != RecordingMode.IMPEDANCE:
+                dlg = QFileDialog()
+                dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+                dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+                dlg.setDefaultSuffix("eeg")
+                if len(self.default_path) > 0:
+                    dlg.setDirectory(self.default_path)
+                dlg.selectFile(self._get_auto_filename(dlg.directory()))
+                namefilters = [u"EEG files (*.eeg)"]
+                if self.default_autoname and (len(self.default_prefix) > 0):
+                    namefilters.prepend(u"EEG files (%s*.eeg)" % self.default_prefix)
+                dlg.setNameFilters(namefilters)
+                ok = False
+                if dlg.exec():
+                    ok = True
+                    files = dlg.selectedFiles()
+                    pf = files[0]
+                    # strip leading/trailing spaces from file name
+                    pn, fn = os.path.split(pf)
+                    self.file_name = os.path.join(pn, fn.strip())
+                    # append the extension .eeg, if not already present
+                    if not self.file_name.lower().endswith(".eeg"):
+                        self.file_name += ".eeg"
+                    # additional check for existing files, possibly we have modified the file name
+                    if self.file_name.replace("\\", "/") != pf.replace("\\", "/") and os.path.exists(self.file_name):
+                        ret = QMessageBox.warning(None, "Save As",
+                                                  "%s already exists.\nDo you want to replace it?" % (
+                                                      os.path.split(self.file_name)[1]),
+                                                  QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.No,
+                                                  QMessageBox.StandardButton.No)
+                        if ret != QMessageBox.StandardButton.Ok:
+                            ok = False
+
+                #     if ok and self._prepare_recording():
+                #         self.online_cfg.set_filename(os.path.split(self.file_name)[0],
+                #                                      os.path.split(self.file_name)[1])
+                # if not ok:
+                #     self.online_cfg.set_recording_state(False)
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.STOP)
+
+    def _get_auto_filename(self, searchdir):
+        """
+        Search for next auto file number
+        @param searchdir: Qt.Qdir
+        @return: the generated filename
+        """
+        if not self.default_autoname:
+            return ""
+        numberstring = "?"
+        for n in range(1, self.default_numbersize):
+            numberstring += "?"
+        searchdir.setNameFilters(["%s%s.eeg" % (self.default_prefix, numberstring)])
+        searchdir.setFilter(QDir.Filter.Files)
+        flist = searchdir.entryList()
+        # extract numbers
+        flist.replaceInStrings(".eeg", "", Qt.CaseSensitivity.CaseInsensitive)
+        if len(self.default_prefix) > 0:
+            flist.replaceInStrings(self.default_prefix, "", Qt.CaseSensitivity.CaseInsensitive)
+        numbers = []
+        for f in flist:
+            num = int(f)
+            if num < 10 ** self.default_numbersize - 1:
+                numbers.append(num)
+        if len(numbers) > 0:
+            # get the highest number
+            numbers.sort()
+            fn = numbers[-1] + 1
+        else:
+            fn = 1
+        name = "%s%0*d.eeg" % (self.default_prefix, self.default_numbersize, fn)
+        return name
+
+    def get_online_configuration(self):
+        ''' Get the online configuration pane
+        '''
+        # create online configuration pane
+        self.online_cfg = _OnlineCfgPane(self)
+        # connect recording button
+        # self.connect(self.online_cfg.pushButtonRecord, Qt.SIGNAL("clicked(bool)"), self.set_recording_file)
+        return self.online_cfg
+
+    def get_configuration_pane(self):
+        ''' Get the configuration pane if available
+        - Qt widgets are not reusable, so we have to create it every time
+        '''
+        config = _ConfigurationPane(self)
+        return config
+
+    def getXML(self):
+        ''' Get module properties for XML configuration file
+        @return: objectify XML element::
+            e.g.
+            <StorageVision instance="0" version="1">
+                <path>D:\EEG</path>
+                ...
+            </StorageVision>
+        '''
+        # E = objectify.E
+        # cfg = E.StorageVision(E.d_path(self.default_path),
+        #                       E.d_autoname(self.default_autoname),
+        #                       E.d_prefix(self.default_prefix),
+        #                       E.d_numbersize(self.default_numbersize),
+        #                       E.mindiskspace(self.min_disk_space),
+        #                       version=str(self.xmlVersion),
+        #                       instance=str(self._instance),
+        #                       module="storage")
+        # return cfg
+        pass
+
+    def setXML(self, xml):
+        ''' Set module properties from XML configuration file
+        @param xml: complete objectify XML configuration tree,
+        module will search for matching values
+        '''
+        # search my configuration data
+        storages = xml.xpath("//StorageVision[@module='storage' and @instance='%i']" % self._instance)
+        if len(storages) == 0:
+            # configuration data not found, leave everything unchanged
+            return
+
+            # we should have only one instance from this type
+        cfg = storages[0]
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            # self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            pass
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            self.default_path = cfg.d_path.pyval
+            self.default_autoname = cfg.d_autoname.pyval
+            self.default_prefix = cfg.d_prefix.pyval
+            self.default_numbersize = cfg.d_numbersize.pyval
+            if version > 1:
+                self.min_disk_space = cfg.mindiskspace.pyval
+            else:
+                self.min_disk_space = 1.0
+
+        except Exception as e:
+            # self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+            pass
 
 
 """
