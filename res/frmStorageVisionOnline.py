@@ -148,9 +148,9 @@ class Ui_frmStorageVisionOnline(object):
         self.pushButtonRecord = QtWidgets.QPushButton(parent=self.groupBox)
         self.pushButtonRecord.setMinimumSize(QtCore.QSize(100, 40))
         icon = QtGui.QIcon()
-        with path("", "record_grey.png") as f_path:
+        with path("res", "record_grey.png") as f_path:
             icon.addPixmap(QtGui.QPixmap(str(f_path)), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        with path("", "record.png") as f_path:
+        with path("res", "record.png") as f_path:
             icon.addPixmap(QtGui.QPixmap(str(f_path)), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.On)
         self.pushButtonRecord.setIcon(icon)
         self.pushButtonRecord.setIconSize(QtCore.QSize(32, 32))
