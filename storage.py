@@ -192,6 +192,7 @@ class StorageVision(ModuleBase):
                 t = time.process_time()
                 # convert data to float and write to data file
                 d = datablock.eeg_channels.transpose()
+
                 f = d.flatten().astype(np.float32)
                 sizeof_item = f.dtype.itemsize  # item size in bytes
                 write_items = len(f)  # number of items to write
@@ -199,7 +200,6 @@ class StorageVision(ModuleBase):
                 if nitems != write_items:
                     raise ModuleError(self._object_name, "Write to file %s failed" % self.file_name)
                 # write marker
-                # self._write_marker(self.data.markers, self.data.block_time, self.data.sample_channel[0,0])
                 self.data.markers = self._write_marker(self.data.markers, self.data.block_time,
                                                        self.data.sample_channel[0, 0], sctBreakDiff)
 
@@ -810,6 +810,24 @@ class StorageVision(ModuleBase):
             # self.send_exception(e, severity=ErrorSeverity.NOTIFY)
             pass
 
+    def check_free_space(self, freespace):
+        """ Check for a minimum available free space
+        - If disk runs out of space during recording, stop recording
+        @param freespace: available space in bytes
+        @return: False if disk is out of space
+        """
+        if freespace > 0:
+            return True
+        if self.data_file != 0:
+            # stop recording
+            self.write_error = True
+            self._close_recording()
+            # ToDo: notify application
+            # self.send_event(ModuleEvent(self._object_name, EventType.ERROR,
+            #                             "out of disk space (<%.2fGB), recording stopped"%(self.min_disk_space),
+            #                             severity=ErrorSeverity.NOTIFY))
+        return False
+
 
 """
 Storage module online GUI.
@@ -866,7 +884,7 @@ class _OnlineCfgPane(QFrame, frmStorageVisionOnline.Ui_frmStorageVisionOnline):
         if len(path) > 0:
             free, total = self.module.get_free_space(path)
             if total > 0 and free > 0:
-                ratio = free * 100.0 / total
+                ratio = int(free * 100.0 / total)
             else:
                 ratio = 0
             self.progressBar.setValue(ratio)
@@ -981,9 +999,9 @@ class _ConfigurationPane(QFrame, frmStorageVisionConfig.Ui_frmStorageVisionConfi
         self.storage.default_path = self.lineEditFolder.displayText()
         self.storage.default_prefix = self.lineEditPrefix.displayText().lstrip()
         self.lineEditPrefix.setText(self.storage.default_prefix)
-        self.storage.default_numbersize = self.lineEditCounterSize.displayText().toInt()[0]
+        self.storage.default_numbersize = int(self.lineEditCounterSize.displayText())
         self.storage.default_autoname = self.checkBoxAutoFile.isChecked()
-        self.storage.min_disk_space = self.lineEditSpace.displayText().toDouble()[0]
+        self.storage.min_disk_space = float(self.lineEditSpace.displayText())
         self._showExample()
 
     def _browse(self):
@@ -991,7 +1009,7 @@ class _ConfigurationPane(QFrame, frmStorageVisionConfig.Ui_frmStorageVisionConfi
         Browse for the default data folder
         """
         dlg = QFileDialog()
-        dlg.setFileMode(QFileDialog.FileMode.DirectoryOnly)
+        dlg.setFileMode(QFileDialog.FileMode.Directory)
         dlg.setOption(QFileDialog.Option.ShowDirsOnly)
         dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         if dlg.exec():
