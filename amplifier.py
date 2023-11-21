@@ -614,7 +614,6 @@ class AMP_ActiChamp(ModuleBase):
 
         # put it into the receiver queues
         eeg = copy.copy(self.eeg_data)
-
         self.recordtime = time.process_time() - t
 
         return eeg
