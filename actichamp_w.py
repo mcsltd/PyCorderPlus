@@ -800,6 +800,7 @@ class ActiChamp:
 
         # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
         x = np.fromstring(self.buffer, dtype=np.int32, count=items)
+
         # shape and transpose to 1st axis is channel and 2nd axis is sample
         samplesize = self.properties.CountEeg + self.properties.CountAux + 1 + 1
         x.shape = (-1, samplesize)
@@ -807,7 +808,7 @@ class ActiChamp:
 
         # extract the different channel types
         index = 0
-        eeg = np.array(y[indices], np.cfloat)
+        eeg = np.array(y[indices], np.float64)
 
         # get indices of disconnected electrodes (all values == ADC_MAX)
         # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))

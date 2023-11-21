@@ -14,6 +14,7 @@ Import and instantiate recording modules.
 from amplifier import AMP_ActiChamp, Receiver
 from display import DISP_Scope
 from impedance import IMP_Display
+from storage import StorageVision
 
 
 def InstantiateModules():
@@ -26,6 +27,7 @@ def InstantiateModules():
     # test modules for control amplifier
     modules = [
         AMP_ActiChamp(),
+        StorageVision(),
         IMP_Display(),
         DISP_Scope(instance=0),
         # Receiver()
@@ -82,7 +84,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 self.verticalLayout_OnlinePane.insertWidget(position, pane)
                 position += 1
 
-
     def configurationClicked(self):
         """ Configuration button clicked
         - Open configuration dialog and add configuration panes for each module in the
@@ -95,7 +96,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 dlg.addPane(pane)
         ok = dlg.exec()
         # if ok:
-            # self.saveConfiguration()
+        # self.saveConfiguration()
 
     def defineModuleChain(self):
         """
@@ -144,7 +145,6 @@ class DlgConfiguration(QDialog, frmMainConfiguration.Ui_frmConfiguration):
         self.panes.append(pane)
         gridLayout.addWidget(pane)
         self.tabWidget.setTabText(self.tabWidget.indexOf(tab), pane.windowTitle())
-
 
 
 """
