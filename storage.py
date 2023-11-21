@@ -36,14 +36,13 @@ import platform
 import ctypes as ct
 
 from PyQt6.QtWidgets import QMessageBox, QFileDialog, QFrame
-from PyQt6.QtCore import QDir, QFile, Qt
+from PyQt6.QtCore import QDir, QFile, Qt, QByteArray
 from PyQt6.QtGui import QPalette, QColor, QIntValidator, QDoubleValidator
 
 from modbase import *
 
 from res import frmStorageVisionOnline
 from res import frmStorageVisionConfig
-
 
 """
 Storage module.
@@ -192,7 +191,6 @@ class StorageVision(ModuleBase):
                 t = time.process_time()
                 # convert data to float and write to data file
                 d = datablock.eeg_channels.transpose()
-
                 f = d.flatten().astype(np.float32)
                 sizeof_item = f.dtype.itemsize  # item size in bytes
                 write_items = len(f)  # number of items to write
@@ -673,7 +671,7 @@ class StorageVision(ModuleBase):
                 dlg.selectFile(self._get_auto_filename(dlg.directory()))
                 namefilters = [u"EEG files (*.eeg)"]
                 if self.default_autoname and (len(self.default_prefix) > 0):
-                    namefilters.prepend(u"EEG files (%s*.eeg)" % self.default_prefix)
+                    namefilters.insert(0, u"EEG files (%s*.eeg)" % self.default_prefix)
                 dlg.setNameFilters(namefilters)
                 ok = False
                 if dlg.exec():
@@ -705,8 +703,7 @@ class StorageVision(ModuleBase):
             self.send_exception(e, severity=ErrorSeverity.STOP)
 
     def _get_auto_filename(self, searchdir):
-        """
-        Search for next auto file number
+        """ Search for next auto file number
         @param searchdir: Qt.Qdir
         @return: the generated filename
         """
@@ -719,9 +716,14 @@ class StorageVision(ModuleBase):
         searchdir.setFilter(QDir.Filter.Files)
         flist = searchdir.entryList()
         # extract numbers
-        flist.replaceInStrings(".eeg", "", Qt.CaseSensitivity.CaseInsensitive)
+
+        # flist.replaceInStrings(".eeg", "", Qt.Qt.CaseInsensitive)
+        flist = [s.replace(".eeg", "") for s in flist]
+
         if len(self.default_prefix) > 0:
-            flist.replaceInStrings(self.default_prefix, "", Qt.CaseSensitivity.CaseInsensitive)
+            # flist.replaceInStrings(self.default_prefix, "", Qt.Qt.CaseInsensitive)
+            flist = [s.replace(self.default_prefix, "") for s in flist]
+        flist, list(flist)
         numbers = []
         for f in flist:
             num = int(f)
@@ -960,6 +962,7 @@ class _ConfigurationPane(QFrame, frmStorageVisionConfig.Ui_frmStorageVisionConfi
     """
     Vision Storage configuration pane
     """
+
     def __init__(self, storage, *args):
         """ Constructor
         @param storage: parent module
