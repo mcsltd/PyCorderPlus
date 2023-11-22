@@ -2,7 +2,7 @@ from scipy import signal
 from modbase import *
 from operator import itemgetter
 
-from PyQt6.QtWidgets import QFrame, QStyledItemDelegate, QHeaderView, QAbstractItemView
+from PyQt6.QtWidgets import QFrame, QStyledItemDelegate, QHeaderView, QAbstractItemView, QComboBox
 from PyQt6.QtCore import QAbstractTableModel, pyqtSignal
 from PyQt6.QtGui import QColor
 from res import frmFilterConfig
@@ -287,13 +287,16 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
         self.comboBoxEegLowpass.currentIndexChanged.connect(self._lowpassChanged)
 
     def _get_cb_index(self, cb, value):
-        """ Get closest matching combobox index
+        ''' Get closest matching combobox index
         @param cb: combobox object
         @param value: float lookup value
-        """
+        '''
         itemlist = []
         for i in range(cb.count()):
-            val, ok = cb.itemText(i).toFloat()
+            try:
+                val = float(cb.itemText(i))
+            except:
+                val = 0.0
             itemlist.append((i, val))
         idx = itemlist[-1][0]
         for item in sorted(itemlist, key=itemgetter(1)):
@@ -319,7 +322,7 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
         """
         # AUX channel table
         mask = lambda x: x.group != ChannelGroup.EEG
-        ch_map = np.array(map(mask, self.filter.params.channel_properties))
+        ch_map = np.array(list(map(mask, self.filter.params.channel_properties)))
         ch_indices = np.nonzero(ch_map)[0]
         self.table_model = _ConfigTableModel(self.filter.params.channel_properties[ch_indices])
         self.tableView.setModel(self.table_model)
@@ -418,13 +421,22 @@ class _ConfigTableModel(QAbstractTableModel):
             property.name = str(value)
             return True
         elif property_name == 'lowpass':
-            property.lowpass = float(value)
+
+            try:
+                property.lowpass = float(value)
+            except:
+                property.lowpass = 0.0
+
             if property.group == ChannelGroup.EEG:
                 for prop in self.arraydata:
                     prop.lowpass = property.lowpass
             return True
         elif property_name == 'highpass':
-            property.highpass = float(value)
+            try:
+                property.highpass = float(value)
+            except:
+                property.highpass = 0.0
+
             if property.group == ChannelGroup.EEG:
                 for prop in self.arraydata:
                     prop.highpass = property.highpass
@@ -434,7 +446,7 @@ class _ConfigTableModel(QAbstractTableModel):
             if property.group == ChannelGroup.EEG:
                 for prop in self.arraydata:
                     prop.notchfilter = property.notchfilter
-                self.resetInternalData()
+                self.revert()
                 # self.reset()
             return True
         elif property_name == 'isReference':
@@ -445,7 +457,7 @@ class _ConfigTableModel(QAbstractTableModel):
                     for prop in self.arraydata:
                         prop.isReference = False
                 property.isReference = bool(value)
-                self.resetInternalData()
+                self.revert()
                 # self.reset()
             return True
         return False
@@ -503,9 +515,9 @@ class _ConfigTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.CheckStateRole:
             if value:
-                return Qt.ItemDataRole.Checked
+                return Qt.CheckState.Checked
             else:
-                return Qt.ItemDataRole.Unchecked
+                return Qt.CheckState.Unchecked
 
         elif (role == Qt.ItemDataRole.DisplayRole) or (role == Qt.ItemDataRole.EditRole):
             if type(value) is not bool:
@@ -575,3 +587,33 @@ class _ConfigItemDelegate(QStyledItemDelegate):
 
     def __init__(self, parent=None):
         super(_ConfigItemDelegate, self).__init__(parent)
+
+    def createEditor(self, parent, option, index):
+        if index.model().editorType(index.column()) == 'combobox':
+            combobox = QComboBox(parent)
+            combobox.addItems(index.model().comboBoxList(index.column()))
+            combobox.setEditable(False)
+            # self.connect(combobox, Qt.SIGNAL('activated(int)'), self.emitCommitData)
+            combobox.activated.connect(self.emitCommitData)
+            return combobox
+        return QStyledItemDelegate.createEditor(self, parent, option, index)
+
+    def setEditorData(self, editor, index):
+        if index.model().columns[index.column()]['editor'] == 'combobox':
+            text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+            i = editor.findText(text)
+            if i == -1:
+                i = 0
+            editor.setCurrentIndex(i)
+        QStyledItemDelegate.setEditorData(self, editor, index)
+
+
+    def setModelData(self, editor, model, index):
+        if model.columns[index.column()]['editor'] == 'combobox':
+            model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
+            model.revert()
+        QStyledItemDelegate.setModelData(self, editor, model, index)
+
+    def emitCommitData(self):
+        self.commitData.emit(self.sender())
+
