@@ -1,9 +1,11 @@
 from scipy import signal
 from modbase import *
-from res import frmFilterConfig
+from operator import itemgetter
 
-from PyQt6.QtWidgets import QFrame, QStyledItemDelegate, QHeaderView
-from PyQt6.QtCore import QAbstractTableModel
+from PyQt6.QtWidgets import QFrame, QStyledItemDelegate, QHeaderView, QAbstractItemView
+from PyQt6.QtCore import QAbstractTableModel, pyqtSignal
+from PyQt6.QtGui import QColor
+from res import frmFilterConfig
 
 
 class FLT_Eeg(ModuleBase):
@@ -235,21 +237,23 @@ class FLT_Eeg(ModuleBase):
         """
         pass
 
+
 """
 Filter module configuration pane.
 """
 
 
-class _ConfigurationPane(QFrame, frmFilterConfig.Ui_frmFilterConfig):
+class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
     """
     Module configuration pane
     """
+    dataChanged = pyqtSignal()
 
     def __init__(self, filter, *args):
-        super().__init__(filter, *args)
+        super().__init__()
 
         self.setupUi(self)
-        self.tableView.horizontalHeader().setResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.tableView.horizontalHeader().ResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         # setup content
         self.filter = filter
@@ -282,6 +286,58 @@ class _ConfigurationPane(QFrame, frmFilterConfig.Ui_frmFilterConfig):
         self.comboBoxEegHighpass.currentIndexChanged.connect(self._highpassChanged)
         self.comboBoxEegLowpass.currentIndexChanged.connect(self._lowpassChanged)
 
+    def _get_cb_index(self, cb, value):
+        """ Get closest matching combobox index
+        @param cb: combobox object
+        @param value: float lookup value
+        """
+        itemlist = []
+        for i in range(cb.count()):
+            val, ok = cb.itemText(i).toFloat()
+            itemlist.append((i, val))
+        idx = itemlist[-1][0]
+        for item in sorted(itemlist, key=itemgetter(1)):
+            if item[1] >= value - 0.0001:
+                idx = item[0]
+                break
+        return idx
+
+    def _notchFrequencyChanged(self, value):
+        self.filter.notchFrequency = float(value)
+
+    def _notchFilterChanged(self, value):
+        self.filter.notchGlobal = (value == Qt.CheckState.Checked)
+
+    def _lowpassChanged(self, value):
+        self.filter.lpGlobal = float(value)
+
+    def _highpassChanged(self, value):
+        self.filter.hpGlobal = float(value)
+
+    def _fillChannelTables(self):
+        """ Create and fill channel tables
+        """
+        # AUX channel table
+        mask = lambda x: x.group != ChannelGroup.EEG
+        ch_map = np.array(map(mask, self.filter.params.channel_properties))
+        ch_indices = np.nonzero(ch_map)[0]
+        self.table_model = _ConfigTableModel(self.filter.params.channel_properties[ch_indices])
+        self.tableView.setModel(self.table_model)
+        self.tableView.setItemDelegate(_ConfigItemDelegate())
+        self.tableView.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
+
+        # actions
+        self.table_model.dataChanged.connect(self._channeltable_changed)
+
+    def _channeltable_changed(self, topLeft, bottomRight):
+        """ SIGNAL data in channel table has changed
+        """
+        # notify parent about changes
+        self.dataChanged.emit()
+
+    def showEvent(self, event):
+        self._fillChannelTables()
+
 
 class _ConfigTableModel(QAbstractTableModel):
     def __init__(self, data, parent=None, *args):
@@ -302,6 +358,214 @@ class _ConfigTableModel(QAbstractTableModel):
         # combo box list contents
         self.lowpasslist = ['off', '10', '20', '30', '50', '100', '200', '500', '1000', '2000']
         self.highpasslist = ['off', '0.01', '0.02', '0.05', '0.1', '0.2', '0.5', '1', '2', '5', '10']
+
+    def _getitem(self, row, column):
+        """ Get amplifier property item based on table row and column
+        @param row: row number
+        @param column: column number
+        @return:  QVariant property value
+        """
+        if (row >= len(self.arraydata)) or (column >= len(self.columns)):
+            return None
+
+        # get channel properties
+        property = self.arraydata[row]
+        # get property name from column description
+        property_name = self.columns[column]['property']
+        # get property value
+        if property_name == 'input':
+            d = property.input
+        elif property_name == 'enable':
+            d = property.enable
+        elif property_name == 'name':
+            d = property.name
+        elif property_name == 'lowpass':
+            if property.lowpass == 0.0:
+                d = 'off'
+            else:
+                d = property.lowpass
+        elif property_name == 'highpass':
+            if property.highpass == 0.0:
+                d = 'off'
+            else:
+                d = property.highpass
+        elif property_name == 'notchfilter':
+            d = property.notchfilter
+        elif property_name == 'isReference':
+            d = property.isReference
+        else:
+            d = None
+        return d
+
+    def _setitem(self, row, column, value):
+        """ Set amplifier property item based on table row and column
+        @param row: row number
+        @param column: column number
+        @param value: QVariant value object
+        @return: True if property value was set, False if not
+        """
+        if (row >= len(self.arraydata)) or (column >= len(self.columns)):
+            return False
+        # get channel properties
+        property = self.arraydata[row]
+        # get property name from column description
+        property_name = self.columns[column]['property']
+        # set channel property
+        if property_name == 'enable':
+            property.enable = bool(value)
+            return True
+        elif property_name == 'name':
+            property.name = str(value)
+            return True
+        elif property_name == 'lowpass':
+            property.lowpass = float(value)
+            if property.group == ChannelGroup.EEG:
+                for prop in self.arraydata:
+                    prop.lowpass = property.lowpass
+            return True
+        elif property_name == 'highpass':
+            property.highpass = float(value)
+            if property.group == ChannelGroup.EEG:
+                for prop in self.arraydata:
+                    prop.highpass = property.highpass
+            return True
+        elif property_name == 'notchfilter':
+            property.notchfilter = bool(value)
+            if property.group == ChannelGroup.EEG:
+                for prop in self.arraydata:
+                    prop.notchfilter = property.notchfilter
+                self.resetInternalData()
+                # self.reset()
+            return True
+        elif property_name == 'isReference':
+            # available for EEG channels only
+            if property.group == ChannelGroup.EEG:
+                # remove previously selected reference channel
+                if bool(value):
+                    for prop in self.arraydata:
+                        prop.isReference = False
+                property.isReference = bool(value)
+                self.resetInternalData()
+                # self.reset()
+            return True
+        return False
+
+    def editorType(self, column):
+        """ Get the columns editer type from column description
+        @param column: table column number
+        @return: editor type as QVariant (string)
+        """
+        if column >= len(self.columns):
+            return None
+        return self.columns[column]['editor']
+
+    def comboBoxList(self, column):
+        """ Get combo box item list for column 'highpass' or 'lowpass'
+        @param column: table column number
+        @return: combo box item list as QVariant
+        """
+        if column >= len(self.columns):
+            return
+        if self.columns[column]['property'] == 'lowpass':
+            return self.lowpasslist
+        elif self.columns[column]['property'] == 'highpass':
+            return self.highpasslist
+        else:
+            return None
+
+    def rowCount(self, parent):
+        """ Get the number of required table rows
+        @return: number of rows
+        """
+        if parent.isValid():
+            return 0
+        return len(self.arraydata)
+
+    def columnCount(self, parent):
+        """ Get the number of required table columns
+        @return: number of columns
+        """
+        if parent.isValid():
+            return 0
+        return len(self.columns)
+
+    def data(self, index, role):
+        """ Abstract method from QAbstactItemModel to get cell data based on role
+        @param index: QModelIndex table cell reference
+        @param role: given role for the item referred to by the index
+        @return: the data stored under the given role for the item referred to by the index
+        """
+        if not index.isValid():
+            return None
+
+        # get the underlying data
+        value = self._getitem(index.row(), index.column())
+
+        if role == Qt.ItemDataRole.CheckStateRole:
+            if value:
+                return Qt.ItemDataRole.Checked
+            else:
+                return Qt.ItemDataRole.Unchecked
+
+        elif (role == Qt.ItemDataRole.DisplayRole) or (role == Qt.ItemDataRole.EditRole):
+            if type(value) is not bool:
+                return value
+
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            # change background color for reference channel
+            property = self.arraydata[index.row()]
+            # if (property.isReference) and (index.column() == 0):
+            if property.isReference:
+                return QColor(0, 0, 255)
+
+        return None
+
+    def flags(self, index):
+        """ Abstract method from QAbstactItemModel
+        @param index: QModelIndex table cell reference
+        @return: the item flags for the given index
+        """
+        if not index.isValid():
+            return Qt.ItemFlag.ItemIsEnabled
+        if not self.columns[index.column()]['edit']:
+            return Qt.ItemFlag.ItemIsEnabled
+        value = self._getitem(index.row(), index.column())
+        if type(value) is bool:
+            return QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsSelectable
+        return QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+
+    def setData(self, index, value, role):
+        """ Abstract method from QAbstactItemModel to set cell data based on role
+        @param index: QModelIndex table cell reference
+        @param value: QVariant new cell data
+        @param role: given role for the item referred to by the index
+        @return: true if successful; otherwise returns false.
+        """
+        if index.isValid():
+            if role == Qt.ItemDataRole.EditRole:
+                if not self._setitem(index.row(), index.column(), value):
+                    return False
+                # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
+                self.dataChanged.emit(index, index)
+                return True
+            elif role == Qt.ItemDataRole.CheckStateRole:
+                if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked):
+                    return False
+                # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
+                self.dataChanged.emit(index, index)
+                return True
+        return False
+
+    def headerData(self, col, orientation, role):
+        """ Abstract method from QAbstactItemModel to get the column header
+        @param col: column number
+        @param orientation: Qt.Horizontal = column header, Qt.Vertical = row header
+        @param role: given role for the item referred to by the index
+        @return: header
+        """
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            return self.columns[col]['header']
+        return None
 
 
 class _ConfigItemDelegate(QStyledItemDelegate):
