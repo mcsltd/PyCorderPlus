@@ -309,7 +309,7 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
         self.filter.notchFrequency = float(value)
 
     def _notchFilterChanged(self, value):
-        self.filter.notchGlobal = (value == Qt.CheckState.Checked)
+        self.filter.notchGlobal = (value == Qt.CheckState.Checked.value)
 
     def _lowpassChanged(self, value):
         self.filter.lpGlobal = float(value)
@@ -561,7 +561,7 @@ class _ConfigTableModel(QAbstractTableModel):
                 self.dataChanged.emit(index, index)
                 return True
             elif role == Qt.ItemDataRole.CheckStateRole:
-                if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked):
+                if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked.value):
                     return False
                 # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
                 self.dataChanged.emit(index, index)
@@ -600,11 +600,18 @@ class _ConfigItemDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor, index):
         if index.model().columns[index.column()]['editor'] == 'combobox':
-            text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+            text = index.model().data(index, Qt.ItemDataRole.DisplayRole)   # can return different types
+
+            # handler for different types of text variable
+            if type(text) is not str:
+                text = str(text).replace(".0", "") if str(text).endswith(".0") else str(text)
+
             i = editor.findText(text)
+            print(text, i)
             if i == -1:
                 i = 0
             editor.setCurrentIndex(i)
+
         QStyledItemDelegate.setEditorData(self, editor, index)
 
 
