@@ -257,6 +257,7 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
 
         # setup content
         self.filter = filter
+
         # notch frequency
         idx = self._get_cb_index(self.comboBox_Notch, self.filter.notchFrequency)
         if idx >= 0:
@@ -281,10 +282,10 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
         self.checkBoxEegNotch.setChecked(self.filter.notchGlobal)
 
         # actions
-        self.comboBox_Notch.currentIndexChanged.connect(self._notchFrequencyChanged)
+        self.comboBox_Notch.currentTextChanged.connect(self._notchFrequencyChanged)
         self.checkBoxEegNotch.stateChanged.connect(self._notchFilterChanged)
-        self.comboBoxEegHighpass.currentIndexChanged.connect(self._highpassChanged)
-        self.comboBoxEegLowpass.currentIndexChanged.connect(self._lowpassChanged)
+        self.comboBoxEegHighpass.currentTextChanged.connect(self._highpassChanged)
+        self.comboBoxEegLowpass.currentTextChanged.connect(self._lowpassChanged)
 
     def _get_cb_index(self, cb, value):
         ''' Get closest matching combobox index
@@ -306,16 +307,25 @@ class _ConfigurationPane(frmFilterConfig.Ui_frmFilterConfig, QFrame):
         return idx
 
     def _notchFrequencyChanged(self, value):
-        self.filter.notchFrequency = float(value)
+        try:
+            self.filter.notchFrequency = float(value)
+        except:
+            self.filter.notchFrequency = 0.0
 
     def _notchFilterChanged(self, value):
         self.filter.notchGlobal = (value == Qt.CheckState.Checked.value)
 
     def _lowpassChanged(self, value):
-        self.filter.lpGlobal = float(value)
+        try:
+            self.filter.lpGlobal = float(value)
+        except:
+            self.filter.lpGlobal = 0.0
 
     def _highpassChanged(self, value):
-        self.filter.hpGlobal = float(value)
+        try:
+            self.filter.hpGlobal = float(value)
+        except:
+            self.filter.hpGlobal = 0.0
 
     def _fillChannelTables(self):
         """ Create and fill channel tables
@@ -513,13 +523,15 @@ class _ConfigTableModel(QAbstractTableModel):
         # get the underlying data
         value = self._getitem(index.row(), index.column())
 
-        if role == Qt.ItemDataRole.CheckStateRole:
+        if role == Qt.ItemDataRole.CheckStateRole and self.columns[index.column()]['header'] == "Notch":
+
             if value:
                 return Qt.CheckState.Checked
             else:
                 return Qt.CheckState.Unchecked
 
         elif (role == Qt.ItemDataRole.DisplayRole) or (role == Qt.ItemDataRole.EditRole):
+
             if type(value) is not bool:
                 return value
 
@@ -554,13 +566,13 @@ class _ConfigTableModel(QAbstractTableModel):
         @return: true if successful; otherwise returns false.
         """
         if index.isValid():
-            if role == Qt.ItemDataRole.EditRole:
+            if role == Qt.ItemDataRole.EditRole.value:
                 if not self._setitem(index.row(), index.column(), value):
                     return False
                 # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
                 self.dataChanged.emit(index, index)
                 return True
-            elif role == Qt.ItemDataRole.CheckStateRole:
+            elif role == Qt.ItemDataRole.CheckStateRole.value:
                 if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked.value):
                     return False
                 # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
@@ -575,7 +587,7 @@ class _ConfigTableModel(QAbstractTableModel):
         @param role: given role for the item referred to by the index
         @return: header
         """
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole.value:
             return self.columns[col]['header']
         return None
 
@@ -607,13 +619,11 @@ class _ConfigItemDelegate(QStyledItemDelegate):
                 text = str(text).replace(".0", "") if str(text).endswith(".0") else str(text)
 
             i = editor.findText(text)
-            print(text, i)
             if i == -1:
                 i = 0
             editor.setCurrentIndex(i)
 
         QStyledItemDelegate.setEditorData(self, editor, index)
-
 
     def setModelData(self, editor, model, index):
         if model.columns[index.column()]['editor'] == 'combobox':
