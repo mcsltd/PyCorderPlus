@@ -32,8 +32,11 @@ B{Revision:} $LastChangedRevision: 216 $
 """
 from collections import defaultdict
 
-from PyQt6.QtWidgets import QFrame, QMessageBox
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QFrame, QMessageBox, QGridLayout, QVBoxLayout, QLabel, QSpacerItem, QSizePolicy
+from PyQt6.QtGui import QColor
+from PyQt6.QtCore import pyqtSignal, Qt
+
+import textwrap
 
 from modbase import *
 
@@ -427,5 +430,175 @@ class _ConfigurationPane(QFrame):
     """
     Amplifier Test Module configuration pane.
     """
-    dataChanged = pyqtSignal()
-    pass
+    dataChanged = QtCore.pyqtSignal()
+
+    def __init__(self, module, *args):
+        super().__init__(parent=module, *args)
+
+        # reference to our parent module
+        self.module = module
+
+        # Set tab name
+        self.setWindowTitle("Recording Montage")
+
+        # make it nice
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShadow(QFrame.Shadow.Raised)
+
+        # base layout
+        self.gridLayout = QGridLayout(self)
+
+        # reference selection layout
+        self.refLayout = QVBoxLayout()
+
+        # create labels
+        self.labelEeg = QLabel("EEG channels")
+        self.labelOther = QLabel("Other channels")
+
+        self.labelReference = QLabel("Selected Reference Channel(s)")
+        self.labelReference.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.labelReference.setStyleSheet('color: blue')
+
+        self.labelReferenceSelection = QLabel("none")
+        self.labelReferenceSelection.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.labelReferenceSelection.setStyleSheet('color: blue')
+
+        self.labelDuplicates = QLabel("Duplicate channel names detected!")
+        self.labelDuplicates.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.labelDuplicates.setStyleSheet('color: red')
+
+        # create eeg channels table view
+        self.channeltableEeg = GenericTableWidget(self)
+        self.channeltableEeg.resizeColumnsToContents()
+        self.channeltableEeg.setfnValidate(self.validateEEGChannelLabel)
+
+        # create other channels table view
+        self.channeltableOther = GenericTableWidget(self)
+        self.channeltableOther.resizeColumnsToContents()
+        self.channeltableOther.setfnValidate(self.validateAUXChannelLabel)
+
+        self.resetChannelTables()
+
+        # highlight reference channels
+        lcs = lambda x: QColor(0, 0, 255) if x.isReference else None
+        self.channeltableEeg.setfnColorSelect(lcs)
+
+        # set function for checkbox get values (x[0] = column number, x[1] = EEG_ChannelProperties object)
+        if self.module.hideRefChannels:
+            # get the "enable" column number
+            columns = self.getCfgTableViewDescription(eeg=True)[0]
+            colEnable = [c for c in range(len(columns)) if columns[c]["variable"] == "enable"][0]
+            # hide enable for reference channels
+            hideref = lambda x: None if x[0] != colEnable else (False if x[1].isReference else x[1].enable)
+            self.channeltableEeg.setfnCheckBox(hideref)
+
+        # add all items to the layouts
+        self.refLayout.addWidget(self.labelReference)
+        self.refLayout.addWidget(self.labelReferenceSelection)
+        spacerItemRL1 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.refLayout.addItem(spacerItemRL1)
+        self.refLayout.addWidget(self.labelDuplicates)
+
+        self.gridLayout.addWidget(self.labelEeg, 0, 0)
+        self.gridLayout.addWidget(self.channeltableEeg, 1, 0, 1, 2)
+        self.gridLayout.addLayout(self.refLayout, 1, 2, 1, 1)
+
+        self.gridLayout.addWidget(self.labelOther, 2, 0)
+        self.gridLayout.addWidget(self.channeltableOther, 3, 0, 1, 3)
+
+        # actions
+        # self.connect(self.channeltableEeg, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
+        self.channeltableEeg.dataChanged.connect(self._configurationDataChanged)
+
+        # self.connect(self.channeltableOther, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
+        self.channeltableOther.dataChanged.connect(self._configurationDataChanged)
+
+    def validateEEGChannelLabel(self, row, col, data):
+        if col == 5:
+            name = data[row].name.lower()
+            enable = data[row].enable
+            if enable and name in self.labelDictionary and self.labelDictionary[name] > 1:
+                return False
+        return True
+
+
+    def validateAUXChannelLabel(self, row, col, data):
+        if col == 4:
+            name = data[row].name.lower()
+            enable = data[row].enable
+            if enable and name in self.labelDictionary and self.labelDictionary[name] > 1:
+                return False
+        return True
+
+
+    def getCfgTableViewDescription(self, eeg=False):
+        # fields from EEG_ChannelProperties
+        if eeg:
+            columns = [
+                {'variable': 'inputgroup', 'header': 'Port', 'edit': False, 'editor': 'combobox', 'indexed': True},
+                {'variable': 'input', 'header': 'Channel', 'edit': False, 'editor': 'default'},
+                {'variable': 'enable', 'header': 'Enable', 'edit': True, 'editor': 'default'},
+                {'variable': 'isReference', 'header': 'Reference', 'edit': True, 'editor': 'default'},
+                {'variable': 'group', 'header': 'Group', 'edit': False, 'editor': 'combobox', 'indexed': True},
+                {'variable': 'name', 'header': 'Name', 'edit': True, 'editor': 'default'},
+            ]
+            cblist = {'inputgroup': ChannelGroup.Name, 'group': ChannelGroup.Name}
+        else:
+            columns = [
+                {'variable': 'inputgroup', 'header': 'Port', 'edit': False, 'editor': 'combobox', 'indexed': True},
+                {'variable': 'input', 'header': 'Channel', 'edit': False, 'editor': 'default'},
+                {'variable': 'enable', 'header': 'Enable', 'edit': True, 'editor': 'default'},
+                {'variable': 'group', 'header': 'Group', 'edit': False, 'editor': 'combobox', 'indexed': True},
+                # {'variable':'unit', 'header':'Unit', 'edit':True, 'editor':'default'},
+                {'variable': 'name', 'header': 'Name', 'edit': True, 'editor': 'default'},
+            ]
+            cblist = {'inputgroup': ChannelGroup.Name, 'group': ChannelGroup.Name}
+
+        return columns, cblist
+
+    def resetChannelTables(self):
+        # split montage table into eeg and other channels
+        montage = self.module.getMontageList()
+        ch_map = np.array(list(map(lambda x: (x.group == ChannelGroup.EEG), montage)))
+        eeg_indices = np.nonzero(ch_map)[0]  # indices of all eeg channels
+
+        if ch_map.shape[0]:
+            other_indices = np.nonzero(np.invert(ch_map))[0]  # indices of all other channels
+        else:
+            other_indices = []
+
+        # update table widgets
+        description, cblist = self.getCfgTableViewDescription(eeg=True)
+        self.channeltableEeg.setData(montage[eeg_indices], description, cblist)
+        description, cblist = self.getCfgTableViewDescription(eeg=False)
+        self.channeltableOther.setData(montage[other_indices], description, cblist)
+
+        # reset label validation dictionary
+        self.labelDictionary = defaultdict(int)
+
+    def showRefChannels(self):
+        labelText = textwrap.fill(self.module.refChannelNames, 30)
+        self.labelReferenceSelection.setText(labelText)
+
+    def showLabelValidation(self):
+        labelList = [ch.name.lower() for ch in self.channeltableEeg.data if ch.enable ]
+        labelList.extend([ch.name.lower() for ch in self.channeltableOther.data if ch.enable])
+        self.labelDictionary = defaultdict(int)
+        for l in labelList:
+            self.labelDictionary[l] += 1
+        if self.labelDictionary and max(self.labelDictionary.values()) > 1:
+            self.labelDuplicates.show()
+        else:
+            self.labelDuplicates.hide()
+        self.channeltableOther.reset()
+        self.channeltableEeg.reset()
+
+    def showEvent(self, event):
+        self.resetChannelTables()
+        self.showRefChannels()
+        self.showLabelValidation()
+
+    def _configurationDataChanged(self):
+        self.dataChanged.emit()
+        self.showRefChannels()
+        self.showLabelValidation()
