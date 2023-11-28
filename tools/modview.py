@@ -41,21 +41,24 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QPlainTextEdit,
     QSpinBox,
-    QDoubleSpinBox
+    QDoubleSpinBox,
+    QTableView
 )
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 
-class GenericTableWidget(QTableWidget):
+class GenericTableWidget(QTableView):
     """
     Generic model/view table widget
     """
 
+    dataChanged = pyqtSignal()
+
     def __init__(self, *args, **kwargs):
-        ''' Constructor
-        '''
+        """ Constructor
+        """
         super().__init__(*args)
 
         self.setAlternatingRowColors(True)
@@ -89,17 +92,17 @@ class GenericTableWidget(QTableWidget):
         self.data_model = _DataTableModel(self.data, self.descrition, self.cblist)
         self.setModel(self.data_model)
         self.setItemDelegate(_DataItemDelegate())
-        self.setEditTriggers(Qt.QAbstractItemView.AllEditTriggers)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
         self.data_model.fnColorSelect = self.fnColorSelect
         self.data_model.fnCheckBox = self.fnCheckBox
         self.data_model.fnValidate = self.fnValidate
 
         # actions
-        self.data_model.dataChanged.connect(self._table_data_changed)
+        self.data_model.data_changed.connect(self._table_data_changed)
         self.selectionModel().selectionChanged.connect(self._selectionChanged)
 
     def _table_data_changed(self, topLeft, bottomRight):
-        """ SIGNAL data in channel table has changed
+        """ SIGNAL data in channel table changed
         """
         # look for multiple selected rows
         cr = self.currentIndex().row()
@@ -163,7 +166,7 @@ class _DataTableModel(QAbstractTableModel):
     """
     EEG and AUX table data model for the configuration pane
     """
-
+    data_changed = pyqtSignal(QModelIndex, QModelIndex)
     def __init__(self, data, description, cblist, parent=None, *args):
         ''' Constructor
         @param data: list of data objects
@@ -306,7 +309,7 @@ class _DataTableModel(QAbstractTableModel):
         """
         if column >= len(self.columns):
             return None
-        if self.columns[column].has_key('step'):
+        if 'step' in self.columns[column]:
             return self.columns[column]['step']
         else:
             return None
@@ -322,7 +325,7 @@ class _DataTableModel(QAbstractTableModel):
         # get variable name from column description
         variable_name = self.columns[column]['variable']
         # lookup list in dictionary
-        if self.cblist.has_key(variable_name):
+        if variable_name in self.cblist:
             return self.cblist[variable_name]
         else:
             return None
@@ -355,7 +358,7 @@ class _DataTableModel(QAbstractTableModel):
         # get the underlying data
         value = self._getitem(index.row(), index.column())
 
-        if role == Qt.CheckState.CheckStateRole:
+        if role == Qt.ItemDataRole.CheckStateRole:
             # display function override?
             data = self.arraydata[index.row()]
             check = self.fnCheckBox((index.column(), data))
@@ -414,13 +417,13 @@ class _DataTableModel(QAbstractTableModel):
                 if not self._setitem(index.row(), index.column(), value):
                     return False
 
-                self.dataChanged.emit(index, index)
+                self.data_changed.emit(index, index)
 
                 return True
             elif role == Qt.ItemDataRole.CheckStateRole:
                 if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked):
                     return False
-                self.dataChanged.emit(left, right)
+                self.data_changed.emit(left, right)
 
                 return True
         return False
@@ -458,7 +461,7 @@ class _DataItemDelegate(QStyledItemDelegate):
         # multi line editor (plain text)
         if index.model().editorType(index.column()) == 'plaintext':
             editor = QPlainTextEdit(parent)
-            editor.setMinimumHeight(100)
+            editor.setMinimumHeight(300)
             return editor
 
         # get default editor
