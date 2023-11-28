@@ -1,6 +1,16 @@
 import types
 
-from PyQt6.QtWidgets import QTableWidget, QStyledItemDelegate, QAbstractItemView, QHeaderView
+from PyQt6.QtWidgets import (
+    QTableWidget,
+    QStyledItemDelegate,
+    QAbstractItemView,
+    QHeaderView,
+    QComboBox,
+    QPlainTextEdit,
+    QSpinBox,
+    QDoubleSpinBox
+)
+
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QColor
 
@@ -397,4 +407,95 @@ class _DataTableModel(QAbstractTableModel):
 
 
 class _DataItemDelegate(QStyledItemDelegate):
-    pass
+    """
+    Combobox item editor
+    """
+    def __init__(self, parent=None):
+        super(_DataItemDelegate, self).__init__(parent)
+
+    def createEditor(self, parent, option, index):
+        # combo box
+        if index.model().editorType(index.column()) == 'combobox':
+            combobox = QComboBox(parent)
+            combobox.addItems(index.model().comboBoxList(index.column()))
+            combobox.setEditable(False)
+            combobox.activated.connect(self.emitCommitData)
+            return combobox
+
+        # multi line editor (plain text)
+        if index.model().editorType(index.column()) == 'plaintext':
+            editor = QPlainTextEdit(parent)
+            editor.setMinimumHeight(100)
+            return editor
+
+        # get default editor
+        editor = QStyledItemDelegate.createEditor(self, parent, option, index)
+
+        # set min/max Values for integer values if available
+        if isinstance(editor, QSpinBox):
+            min = index.model().editorMinValue(index.column())
+            if min.isValid():
+                editor.setMinimum(int(min))
+            max = index.model().editorMaxValue(index.column())
+            if max.isValid():
+                editor.setMaximum(int(max))
+            step = index.model().editorStep(index.column())
+            if step.isValid():
+                editor.setSingleStep(int(step))
+
+        # set min/max Values for float values if available
+        if isinstance(editor, QDoubleSpinBox):
+            min = index.model().editorMinValue(index.column())
+            if min.isValid():
+                editor.setMinimum(float(min))
+            max = index.model().editorMaxValue(index.column())
+            if max.isValid():
+                editor.setMaximum(float(max))
+            dec = index.model().editorDecimals(index.column())
+            if dec.isValid():
+                editor.setDecimals(int(dec))
+            step = index.model().editorStep(index.column())
+            if step.isValid():
+                editor.setSingleStep(float(step))
+
+        return editor
+
+    def setEditorData(self, editor, index):
+        # if index.model().columns[index.column()]['editor'] == 'combobox':
+        if isinstance(editor, QComboBox):
+            idx = 0
+            # get data
+            d = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+            if d.isValid():
+                if type(d) is str:
+                    # find matching list item text
+                    idx = editor.findText(d)
+                    if idx == -1:
+                        idx = 0
+                else:
+                    # find the closest matching index
+                    closest = lambda a, l: min(enumerate(l), key=lambda x: abs(x[1] - a))
+                    # get item list
+                    itemlist = []
+                    for i in range(editor.count()):
+                        itemlist.append(float(editor.itemText(i)))
+                    # find index
+                    idx = closest(float(d), itemlist)[0]
+
+            editor.setCurrentIndex(idx)
+            return
+        QStyledItemDelegate.setEditorData(self, editor, index)
+
+    def setModelData(self, editor, model, index):
+        #if model.columns[index.column()]['editor'] == 'combobox':
+        if isinstance(editor, QComboBox):
+            model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
+            #model.reset()
+            return
+        QStyledItemDelegate.setModelData(self, editor, model, index)
+
+    def emitCommitData(self):
+        self.commitData.emit(self.sender())
+
+
+

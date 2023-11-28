@@ -602,3 +602,4 @@ class _ConfigurationPane(QFrame):
         self.dataChanged.emit()
         self.showRefChannels()
         self.showLabelValidation()
+
