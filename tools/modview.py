@@ -421,7 +421,7 @@ class _DataTableModel(QAbstractTableModel):
 
                 return True
             elif role == Qt.ItemDataRole.CheckStateRole:
-                if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked):
+                if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked.value):
                     return False
                 self.data_changed.emit(left, right)
 
@@ -526,7 +526,7 @@ class _DataItemDelegate(QStyledItemDelegate):
         #if model.columns[index.column()]['editor'] == 'combobox':
         if isinstance(editor, QComboBox):
             model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
-            #model.reset()
+            model.reset()
             return
         QStyledItemDelegate.setModelData(self, editor, model, index)
 

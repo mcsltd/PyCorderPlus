@@ -39,6 +39,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 import textwrap
 
 from modbase import *
+from tools.modview import GenericTableWidget
 
 
 class MNT_Recording(ModuleBase):
@@ -317,7 +318,6 @@ class MNT_Recording(ModuleBase):
         pass
 
 
-
 class Montage:
     """
     Montage dictionary
@@ -433,7 +433,7 @@ class _ConfigurationPane(QFrame):
     dataChanged = QtCore.pyqtSignal()
 
     def __init__(self, module, *args):
-        super().__init__(parent=module, *args)
+        super().__init__()
 
         # reference to our parent module
         self.module = module
@@ -521,7 +521,6 @@ class _ConfigurationPane(QFrame):
                 return False
         return True
 
-
     def validateAUXChannelLabel(self, row, col, data):
         if col == 4:
             name = data[row].name.lower()
@@ -529,7 +528,6 @@ class _ConfigurationPane(QFrame):
             if enable and name in self.labelDictionary and self.labelDictionary[name] > 1:
                 return False
         return True
-
 
     def getCfgTableViewDescription(self, eeg=False):
         # fields from EEG_ChannelProperties
@@ -581,7 +579,7 @@ class _ConfigurationPane(QFrame):
         self.labelReferenceSelection.setText(labelText)
 
     def showLabelValidation(self):
-        labelList = [ch.name.lower() for ch in self.channeltableEeg.data if ch.enable ]
+        labelList = [ch.name.lower() for ch in self.channeltableEeg.data if ch.enable]
         labelList.extend([ch.name.lower() for ch in self.channeltableOther.data if ch.enable])
         self.labelDictionary = defaultdict(int)
         for l in labelList:
@@ -602,4 +600,3 @@ class _ConfigurationPane(QFrame):
         self.dataChanged.emit()
         self.showRefChannels()
         self.showLabelValidation()
-
