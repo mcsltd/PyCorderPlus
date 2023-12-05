@@ -461,7 +461,7 @@ class _DataItemDelegate(QStyledItemDelegate):
         # multi line editor (plain text)
         if index.model().editorType(index.column()) == 'plaintext':
             editor = QPlainTextEdit(parent)
-            editor.setMinimumHeight(300)
+            editor.setMinimumHeight(100)
             return editor
 
         # get default editor
