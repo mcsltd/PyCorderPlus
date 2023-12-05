@@ -12,6 +12,7 @@ from res import frmMainConfiguration
 Import and instantiate recording modules.
 """
 from amplifier import AMP_ActiChamp, Receiver
+from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
 from storage import StorageVision
@@ -27,6 +28,7 @@ def InstantiateModules():
     # test modules for control amplifier
     modules = [
         AMP_ActiChamp(),
+        MNT_Recording(),
         StorageVision(),
         IMP_Display(),
         DISP_Scope(instance=0),
