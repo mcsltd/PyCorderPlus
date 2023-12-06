@@ -1,5 +1,11 @@
+import re
 import sys
+from filecmp import cmp
+
+from lxml import objectify
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout
+from PyQt6.QtCore import QDir
 
 """
 Import GUI resources.
@@ -43,16 +49,22 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     includes main menu, status bar and module handling
     """
 
-    def __init__(self):
+    def __init__(self, config_dir, config_file, name_amplifier, log_dir):
         super().__init__()
-
         self.setupUi(self)
+
+        # set config
+        self.config_dir = config_dir
+        self.config_file = config_file
+        self.name_amplifier = name_amplifier
+        self.log_dir = log_dir
+
 
         # menu actions
         self.actionQuit.triggered.connect(self.close)
-
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -154,6 +166,25 @@ Utilities.
 """
 
 
+def cmpver(a, b, n=3):
+    """ Compare two version numbers
+    @param a: version number 1
+    @param b: version number 2
+    @param n: number of categories to compare
+    @return:  -1 if a<b, 0 if a=b, 1 if a>b
+    """
+
+    def fixup(i):
+        try:
+            return int(i)
+        except ValueError:
+            return i
+
+    a = map(fixup, re.findall("\d+|\w+", a))
+    b = map(fixup, re.findall("\d+|\w+", b))
+    return cmp(a[:n], b[:n])
+
+
 def flatten(lst):
     """ Flatten a list containing lists or tuples
     """
@@ -165,10 +196,62 @@ def flatten(lst):
             yield elem
 
 
+NAME_APPLICATION = "PyCorderPlus"
+VERSION = "0.0.0"
+
+
+def load_preferences():
+    """
+    Load preferences from XML file
+    :return:
+    """
+
+    configuration_dir = ""
+    configuration_file = ""
+    name_amplifier = ""
+    log_dir = ""
+
+    try:
+        # preferences will be stored to user home directory
+        homedir = QDir.home()
+        appdir = "." + NAME_APPLICATION
+        if not homedir.cd(appdir):
+            return
+        filename = homedir.absoluteFilePath("preferences.xml")
+
+        # read XML file
+        cfg = objectify.parse(filename)
+        # check application and version
+        app = cfg.xpath("//PyCorderPlus")
+        if (len(app) == 0) or (app[0].get("version") is None):
+            # configuration data not found
+            return
+            # check version
+        version = app[0].get("version")
+        if cmpver(version, VERSION, 2) > 0:
+            # wrong version
+            return
+
+        # update preferences
+        preferences = app[0].preferences
+        configuration_dir = preferences.config_dir.pyval
+        configuration_file = preferences.config_file.pyval
+        name_amplifier = preferences.name_amplifier.pyval
+        log_dir = preferences.log_dir.pyval
+
+        return configuration_dir, configuration_file, name_amplifier, log_dir
+    except Exception as err:
+
+        return configuration_dir, configuration_file, name_amplifier, log_dir
+
+
 def main(args):
     """
     Create and start up main application
     """
+
+    configuration_dir, configuration_file, name_amplifier, log_dir = load_preferences()
+
     app = QApplication(sys.argv)
     win = MainWindow()
 
