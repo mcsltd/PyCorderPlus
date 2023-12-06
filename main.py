@@ -2,7 +2,7 @@ import re
 import sys
 from filecmp import cmp
 
-from lxml import objectify
+from lxml import objectify, etree
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout
 from PyQt6.QtCore import QDir
@@ -59,7 +59,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.name_amplifier = name_amplifier
         self.log_dir = log_dir
 
-
         # menu actions
         self.actionQuit.triggered.connect(self.close)
         # button actions
@@ -97,6 +96,30 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             if pane is not None:
                 self.verticalLayout_OnlinePane.insertWidget(position, pane)
                 position += 1
+
+    def save_preferences(self):
+        """
+        Save preferences to XML file
+        :return:
+        """
+        E = objectify.E
+        preferences = E.preferences(E.config_dir(self.config_dir),
+                                    E.config_file(self.config_file),
+                                    E.name_amplifier(self.name_amplifier),
+                                    E.log_dir(self.log_dir))
+        root = E.PyCorderPlus(preferences, version=VERSION)
+
+        # preferences will be stored to user home directory
+        try:
+            homedir = QDir.home()
+            appdir = "." + NAME_APPLICATION
+            if not homedir.cd(appdir):
+                homedir.mkdir(appdir)
+                homedir.cd(appdir)
+            filename = homedir.absoluteFilePath("preferences.xml")
+            etree.ElementTree(root).write(filename, pretty_print=True, encoding="UTF-8")
+        except:
+            pass
 
     def configurationClicked(self):
         """ Configuration button clicked
@@ -253,7 +276,12 @@ def main(args):
     configuration_dir, configuration_file, name_amplifier, log_dir = load_preferences()
 
     app = QApplication(sys.argv)
-    win = MainWindow()
+    win = MainWindow(
+        config_dir=configuration_dir,
+        config_file=configuration_file,
+        name_amplifier=name_amplifier,
+        log_dir=log_dir
+    )
 
     # win.showMaximized()
     win.show()
