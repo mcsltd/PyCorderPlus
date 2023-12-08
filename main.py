@@ -13,6 +13,7 @@ Import GUI resources.
 
 from res import frmMain
 from res import frmMainConfiguration
+from res import frmDialogSelectAmp
 
 """
 Import and instantiate recording modules.
@@ -22,6 +23,51 @@ from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
 from storage import StorageVision
+
+
+def load_preferences():
+    """
+    Load preferences from XML file
+    :return:
+    """
+
+    configuration_dir = ""
+    configuration_file = ""
+    name_amplifier = ""
+    log_dir = ""
+
+    try:
+        # preferences will be stored to user home directory
+        homedir = QDir.home()
+        appdir = "." + NAME_APPLICATION
+        if not homedir.cd(appdir):
+            return
+        filename = homedir.absoluteFilePath("preferences.xml")
+
+        # read XML file
+        cfg = objectify.parse(filename)
+        # check application and version
+        app = cfg.xpath("//PyCorderPlus")
+        if (len(app) == 0) or (app[0].get("version") is None):
+            # configuration data not found
+            return
+            # check version
+        version = app[0].get("version")
+        if cmpver(version, VERSION, 2) > 0:
+            # wrong version
+            return
+
+        # update preferences
+        preferences = app[0].preferences
+        configuration_dir = preferences.config_dir.pyval
+        configuration_file = preferences.config_file.pyval
+        name_amplifier = preferences.name_amplifier.pyval
+        log_dir = preferences.log_dir.pyval
+
+        return configuration_dir, configuration_file, name_amplifier, log_dir
+    except Exception as err:
+
+        return configuration_dir, configuration_file, name_amplifier, log_dir
 
 
 def InstantiateModules():
@@ -63,7 +109,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.actionQuit.triggered.connect(self.close)
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
-
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -219,53 +264,21 @@ def flatten(lst):
             yield elem
 
 
+"""
+Amplifier type selection window.
+"""
+
+from PyQt6.QtCore import QCoreApplication
+
+
+class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+
 NAME_APPLICATION = "PyCorderPlus"
 VERSION = "0.0.0"
-
-
-def load_preferences():
-    """
-    Load preferences from XML file
-    :return:
-    """
-
-    configuration_dir = ""
-    configuration_file = ""
-    name_amplifier = ""
-    log_dir = ""
-
-    try:
-        # preferences will be stored to user home directory
-        homedir = QDir.home()
-        appdir = "." + NAME_APPLICATION
-        if not homedir.cd(appdir):
-            return
-        filename = homedir.absoluteFilePath("preferences.xml")
-
-        # read XML file
-        cfg = objectify.parse(filename)
-        # check application and version
-        app = cfg.xpath("//PyCorderPlus")
-        if (len(app) == 0) or (app[0].get("version") is None):
-            # configuration data not found
-            return
-            # check version
-        version = app[0].get("version")
-        if cmpver(version, VERSION, 2) > 0:
-            # wrong version
-            return
-
-        # update preferences
-        preferences = app[0].preferences
-        configuration_dir = preferences.config_dir.pyval
-        configuration_file = preferences.config_file.pyval
-        name_amplifier = preferences.name_amplifier.pyval
-        log_dir = preferences.log_dir.pyval
-
-        return configuration_dir, configuration_file, name_amplifier, log_dir
-    except Exception as err:
-
-        return configuration_dir, configuration_file, name_amplifier, log_dir
 
 
 def main(args):
@@ -273,19 +286,25 @@ def main(args):
     Create and start up main application
     """
 
-    configuration_dir, configuration_file, name_amplifier, log_dir = load_preferences()
+    configuration_dir, \
+        configuration_file, \
+        name_amplifier, log_dir = load_preferences()
 
     app = QApplication(sys.argv)
-    win = MainWindow(
-        config_dir=configuration_dir,
-        config_file=configuration_file,
-        name_amplifier=name_amplifier,
-        log_dir=log_dir
-    )
 
+    # win = MainWindow(
+    #     config_dir=configuration_dir,
+    #     config_file=configuration_file,
+    #     name_amplifier=name_amplifier,
+    #     log_dir=log_dir
+    # )
+
+    dlg = DlgAmpTypeSelection()
+    dlg.show()
     # win.showMaximized()
-    win.show()
+    # win.show()
     app.exec()
+    print(dlg)
 
 
 if __name__ == "__main__":
