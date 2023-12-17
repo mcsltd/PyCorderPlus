@@ -4,7 +4,7 @@ from filecmp import cmp
 
 from lxml import objectify, etree
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox
 from PyQt6.QtCore import QDir
 
 """
@@ -24,50 +24,6 @@ from display import DISP_Scope
 from impedance import IMP_Display
 from storage import StorageVision
 
-
-def load_preferences():
-    """
-    Load preferences from XML file
-    :return:
-    """
-
-    configuration_dir = ""
-    configuration_file = ""
-    name_amplifier = ""
-    log_dir = ""
-
-    try:
-        # preferences will be stored to user home directory
-        homedir = QDir.home()
-        appdir = "." + NAME_APPLICATION
-        if not homedir.cd(appdir):
-            return
-        filename = homedir.absoluteFilePath("preferences.xml")
-
-        # read XML file
-        cfg = objectify.parse(filename)
-        # check application and version
-        app = cfg.xpath("//PyCorderPlus")
-        if (len(app) == 0) or (app[0].get("version") is None):
-            # configuration data not found
-            return
-            # check version
-        version = app[0].get("version")
-        if cmpver(version, VERSION, 2) > 0:
-            # wrong version
-            return
-
-        # update preferences
-        preferences = app[0].preferences
-        configuration_dir = preferences.config_dir.pyval
-        configuration_file = preferences.config_file.pyval
-        name_amplifier = preferences.name_amplifier.pyval
-        log_dir = preferences.log_dir.pyval
-
-        return configuration_dir, configuration_file, name_amplifier, log_dir
-    except Exception as err:
-
-        return configuration_dir, configuration_file, name_amplifier, log_dir
 
 
 def InstantiateModules():
@@ -95,20 +51,27 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     includes main menu, status bar and module handling
     """
 
-    def __init__(self, config_dir, config_file, name_amplifier, log_dir):
+    def __init__(self):
+
         super().__init__()
         self.setupUi(self)
 
-        # set config
-        self.config_dir = config_dir
-        self.config_file = config_file
-        self.name_amplifier = name_amplifier
-        self.log_dir = log_dir
-
         # menu actions
         self.actionQuit.triggered.connect(self.close)
+
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
+        # preferences
+        self.application_name = "PyCorderPlus"
+        self.name_amplifier = ""
+        self.configuration_file = ""
+        self.configuration_dir = ""
+        self.log_dir = ""
+        self.loadPreferences()
+        self.recording_mode = -1
+        self.usageConfirmed = False
+
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -142,6 +105,52 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 self.verticalLayout_OnlinePane.insertWidget(position, pane)
                 position += 1
 
+    def loadPreferences(self):
+        """
+        Load preferences from XML file
+        :return:
+        """
+        try:
+            # preferences will be stored to user home directory
+            homedir = QDir.home()
+            appdir = "." + self.application_name
+            if not homedir.cd(appdir):
+                return
+            filename = homedir.absoluteFilePath("preferences.xml")
+
+            # read XML file
+            cfg = objectify.parse(filename)
+            # check application and version
+            app = cfg.xpath("//PyCorderPlus")
+            if (len(app) == 0) or (app[0].get("version") is None):
+                # configuration data not found
+                return
+                # check version
+            version = app[0].get("version")
+            if cmpver(version, __version__, 2) > 0:
+                # wrong version
+                return
+
+            # update preferences
+            preferences = app[0].preferences
+            self.configuration_dir = preferences.config_dir.pyval
+            self.configuration_file = preferences.config_file.pyval
+            self.name_amplifier = preferences.name_amplifier.pyval
+            self.log_dir = preferences.log_dir.pyval
+        except:
+            # activating the device selection dialog
+            dlg = DlgAmpTypeSelection()
+            ok = dlg.exec()
+
+            # ok == 1: selected amplifier type
+            # ok == 0: amplifier type not selected - exit the application
+            if ok:
+                self.name_amplifier = dlg.name_amp
+            else:
+                # add exit in application
+                QApplication.quit()
+
+
     def save_preferences(self):
         """
         Save preferences to XML file
@@ -152,7 +161,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                                     E.config_file(self.config_file),
                                     E.name_amplifier(self.name_amplifier),
                                     E.log_dir(self.log_dir))
-        root = E.PyCorderPlus(preferences, version=VERSION)
+        root = E.PyCorderPlus(preferences, version=__version__)
 
         # preferences will be stored to user home directory
         try:
@@ -275,10 +284,35 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.name_amp = ""
+        self.radioButton.setChecked(True)
+        self.buttonBox.clicked.connect(self.set_name)
+
+    def set_name(self):
+        # set name
+        if self.radioButton.isChecked():
+            self.name_amp = AMP_ActiChamp.__name__
+
+        # chose amplifier neorec
+        if self.radioButton_2.isChecked():
+            self.name_amp = "AMP_NeoRec"
+
+    def closeEvent(self, event):
+        res = QMessageBox.warning(
+            self,
+            "Warning!",
+            "Closing the window without an amplifier type selected "
+            "will close the PyCorderPlus application. Do you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if res == QMessageBox.StandardButton.No:
+            event.ignore()
+
 
 
 NAME_APPLICATION = "PyCorderPlus"
-VERSION = "0.0.0"
+__version__ = "0.0.0"
 
 
 def main(args):
@@ -286,25 +320,22 @@ def main(args):
     Create and start up main application
     """
 
-    configuration_dir, \
-        configuration_file, \
-        name_amplifier, log_dir = load_preferences()
+    # configuration_dir, \
+    #     configuration_file, \
+    #     name_amplifier, log_dir = load_preferences()
+    #
+    # app = QApplication(sys.argv)
+    # dlg = DlgAmpTypeSelection()
+    # dlg.show()
+    # app.exec()
+    # del app
+    #
+    # name_amplifier = dlg.name_amp
 
     app = QApplication(sys.argv)
-
-    # win = MainWindow(
-    #     config_dir=configuration_dir,
-    #     config_file=configuration_file,
-    #     name_amplifier=name_amplifier,
-    #     log_dir=log_dir
-    # )
-
-    dlg = DlgAmpTypeSelection()
-    dlg.show()
-    # win.showMaximized()
-    # win.show()
+    win = MainWindow()
+    win.showMaximized()
     app.exec()
-    print(dlg)
 
 
 if __name__ == "__main__":
