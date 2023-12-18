@@ -1,6 +1,6 @@
 import re
 import sys
-from filecmp import cmp
+import os
 
 from lxml import objectify, etree
 
@@ -102,6 +102,89 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             if pane is not None:
                 self.verticalLayout_OnlinePane.insertWidget(position, pane)
                 position += 1
+
+        # load configuration file
+        # try to load the last configuration file
+        try:
+            if len(self.configuration_file) > 0:
+                cfg = os.path.normpath(self.configuration_dir + '/' + self.configuration_file)
+                self._loadConfiguration(cfg)
+            else:
+                self.defaultConfiguration()
+        except:
+            pass
+
+        # update log text module info
+        # self.updateModuleInfo()
+
+        # update button states
+        self.updateUI()
+
+    def updateUI(self, isRunning=False):
+        """ Update user interface to reflect the recording state
+        """
+        if isRunning:
+            self.pushButtonConfiguration.setEnabled(False)
+            self.actionLoad_Configuration.setEnabled(False)
+            self.actionSave_Configuration.setEnabled(False)
+            self.actionQuit.setEnabled(False)
+            self.actionDefault_Configuration.setEnabled(False)
+        else:
+            self.pushButtonConfiguration.setEnabled(True)
+            self.actionLoad_Configuration.setEnabled(True)
+            self.actionSave_Configuration.setEnabled(True)
+            self.actionQuit.setEnabled(True)
+            self.actionDefault_Configuration.setEnabled(True)
+            # self.statusWidget.resetUtilization()
+
+    def defaultConfiguration(self):
+        """
+        Menu "Reset Configuration":
+        Set default values for all modules
+        """
+        # reset all modules
+        for module in flatten(self.modules):
+            module.setDefault()
+
+        # update module chain, starting from top module
+        self.topmodule.update_receivers()
+
+        # update status line
+        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info="default", status_field="Workspace"))
+
+    def _loadConfiguration(self, filename):
+        """
+        Load module configuration from XML file
+        @param filename: Full qualified XML file name
+        """
+        ok = True
+        cfg = objectify.parse(filename)
+        # check application and version
+        app = cfg.xpath("//PyCorderPlus")
+
+        if (len(app) == 0) or (app[0].get("version") == None):
+            # configuration data not found
+            # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s is not a valid PyCorder configuration file"%(filename), severity=1))
+            ok = False
+
+        if ok:
+            version = app[0].get("version")
+            if cmpver(version, __version__, 2) > 0:
+                # wrong version
+                # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s wrong version %s > %s" % (filename, version, __version__), severity=ErrorSeverity.NOTIFY))
+                ok = False
+
+                # setup modules from configuration file
+                if ok:
+                    for module in flatten(self.modules):
+                        module.setXML(cfg)
+
+                # update module chain, starting from top module
+                self.topmodule.update_receivers()
+
+                # update status line
+                file_name, ext = os.path.splitext(os.path.split(filename)[1])
+                # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
 
     def loadPreferences(self):
         """
@@ -275,11 +358,13 @@ def cmpver(a, b, n=3):
     @param n: number of categories to compare
     @return:  -1 if a<b, 0 if a=b, 1 if a>b
     '''
+
     def fixup(i):
         try:
             return int(i)
         except ValueError:
             return i
+
     a = list(map(fixup, re.findall(r"\d+|\w+", a)))
     b = list(map(fixup, re.findall(r"\d+|\w+", b)))
     return (a[:n] > b[:n]) - (a[:n] < b[:n])
