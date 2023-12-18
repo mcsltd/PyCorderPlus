@@ -408,8 +408,8 @@ class ModuleBase(QObject):
                 self._work.start()
 
     def stop(self):
-        ''' Stop the data transfer.  Don't override this method.
-        '''
+        """ Stop the data transfer.  Don't override this method.
+        """
         # terminate the data transfer worker thread
         if self._usethread:
             self._running = False

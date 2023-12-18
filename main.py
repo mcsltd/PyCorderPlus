@@ -197,10 +197,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         """
         ok = True
         cfg = objectify.parse(filename)
+
         # check application and version
         app = cfg.xpath("//PyCorderPlus")
 
-        if (len(app) == 0) or (app[0].get("version") == None):
+        if (len(app) == 0) or (app[0].get("version") is None):
             # configuration data not found
             # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s is not a valid PyCorder configuration file"%(filename), severity=1))
             ok = False
@@ -212,17 +213,17 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s wrong version %s > %s" % (filename, version, __version__), severity=ErrorSeverity.NOTIFY))
                 ok = False
 
-                # setup modules from configuration file
-                if ok:
-                    for module in flatten(self.modules):
-                        module.setXML(cfg)
+        # setup modules from configuration file
+        if ok:
+            for module in flatten(self.modules):
+                module.setXML(cfg)
 
-                # update module chain, starting from top module
-                self.topmodule.update_receivers()
+        # update module chain, starting from top module
+        self.topmodule.update_receivers()
 
-                # update status line
-                file_name, ext = os.path.splitext(os.path.split(filename)[1])
-                # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
+        # update status line
+        file_name, ext = os.path.splitext(os.path.split(filename)[1])
+        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
 
     def saveConfiguration(self):
         """
@@ -255,7 +256,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                                               status_field="Workspace"))
             except Exception as e:
                 tb = GetExceptionTraceBack()[0]
-                self.processEvent(ModuleEvent("Save Configuration", EventType.ERROR, \
+                self.processEvent(ModuleEvent("Save Configuration", EventType.ERROR,
                                               tb + " -> %s " % file_name + str(e),
                                               severity=ErrorSeverity.NOTIFY))
 
@@ -268,7 +269,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get configuration from each connected module
         for module in flatten(self.modules):
             cfg = module.getXML()
-            if cfg != None:
+            if cfg is not None:
                 modules.append(cfg)
         # build complete configuration tree
         root = E.PyCorderPlus(modules, version=__version__)
@@ -307,8 +308,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 # check version
             version = app[0].get("version")
 
-            flag = cmpver(version, __version__, 2)
-            c = 1
             if cmpver(version, __version__, 2) > 0:
                 # wrong version
                 # activating the device selection dialog

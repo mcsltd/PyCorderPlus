@@ -29,6 +29,7 @@ along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
 @version: 1.0
 '''
 import time
+from operator import itemgetter
 
 from scipy import signal
 from PyQt6.QtWidgets import (QFrame,
@@ -376,16 +377,28 @@ class AMP_ActiChamp(ModuleBase):
         return True
 
     def _set_default_filter(self):
-        ''' set all filter properties to HW filter values
-        '''
+        """ set all filter properties to HW filter values
+        """
         for channel in self.channel_config:
             channel.highpass = 0.0  # high pass off
             channel.lowpass = 0.0  # low pass off
             channel.notchfilter = False  # notch filter off
 
+    def _check_reference(self):
+        """ check if selected reference channels are consistent with the global flag
+        """
+        # nothing to do if multiple channels are allowed
+        if AMP_MULTIPLE_REF:
+            return
+        # else keep the first reference channel only
+        eeg_ref = np.array(list(map(lambda x: x.isReference, self.channel_config)))
+        ref_index = np.nonzero(eeg_ref)[0]     # indices of reference channel(s)
+        for ch in self.channel_config[ref_index[1:]]:
+            ch.isReference = False
+
     def process_start(self):
-        ''' Open amplifier hardware and start data acquisition
-        '''
+        """ Open amplifier hardware and start data acquisition
+        """
         # reset variables
         self.eeg_data.sample_counter = 0
         self.acquisitionTimeoutCounter = 0
@@ -735,6 +748,87 @@ class AMP_ActiChamp(ModuleBase):
         #                             info="%.0f Hz" % self.eeg_data.sample_rate,
         #                             status_field="Rate"))
         return copy.copy(self.eeg_data)
+
+    def getXML(self):
+        ''' Get module properties for XML configuration file
+        @return: objectify XML element::
+            <ActiChamp instance="0" version="1" module="amplifier">
+                <channels>
+                    ...
+                </channels>
+                <samplerate>1000</samplerate>
+            </ActiChamp>
+        '''
+        E = objectify.E
+
+        channels = E.channels()
+        if AMP_MONTAGE:
+            for channel in self.channel_config:
+                channels.append(channel.getXML())
+
+        # input device container
+        # devices = E.InputDeviceContainer(self.inputDevices.getXML())
+
+        amplifier = E.AMP_ActiChamp(E.samplerate(self.sample_rate['value']),
+                                    E.pllexternal(self.amp.PllExternal),
+                                    channels,
+                                    # devices,
+                                    version=str(self.xmlVersion),
+                                    instance=str(self._instance),
+                                    module="amplifier")
+        return amplifier
+
+    def setXML(self, xml):
+        ''' Set module properties from XML configuration file
+        @param xml: complete objectify XML configuration tree,
+        module will search for matching values
+        '''
+        # set default values in case we get no configuration data
+        # self.inputDevices.reset()
+
+        # search my configuration data
+        amps = xml.xpath("//AMP_ActiChamp[@module='amplifier' and @instance='%i']" % self._instance)
+        if len(amps) == 0:
+            return  # configuration data not found, leave everything unchanged
+
+        cfg = amps[0]  # we should have only one amplifier instance from this type
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            # setup channel configuration from xml
+            for idx, channel in enumerate(cfg.channels.iterchildren()):
+                self.channel_config[idx].setXML(channel)
+            # reset filter properties to default values (because configuration has been moved to filter module)
+            self._set_default_filter()
+            # validate reference channel selection
+            self._check_reference()
+            # set closest matching sample rate
+            sr = cfg.samplerate.pyval
+            for rate in sorted(self.sample_rates, key=itemgetter('value')):
+                if rate["value"] >= sr:
+                    self.sample_rate = rate
+                    break
+            if version >= 2:
+                # setup the input device configuration
+                # self.inputDevices.setXML(cfg.InputDeviceContainer)
+                pass
+            else:
+                # self.inputDevices.reset()
+                pass
+            if version >= 3:
+                self.amp.PllExternal = cfg.pllexternal.pyval
+            else:
+                self.amp.PllExternal = 0
+
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
 
 
 """
