@@ -70,8 +70,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.log_dir = ""
         self.loadPreferences()
         self.recording_mode = -1
-        self.usageConfirmed = False
-
+        # self.usageConfirmed = False
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -115,6 +114,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             homedir = QDir.home()
             appdir = "." + self.application_name
             if not homedir.cd(appdir):
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                self.name_amplifier = dlg.name_amp
                 return
             filename = homedir.absoluteFilePath("preferences.xml")
 
@@ -124,11 +127,21 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             app = cfg.xpath("//PyCorderPlus")
             if (len(app) == 0) or (app[0].get("version") is None):
                 # configuration data not found
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                # set amplifier type
+                self.name_amplifier = dlg.name_amp
                 return
                 # check version
             version = app[0].get("version")
             if cmpver(version, __version__, 2) > 0:
                 # wrong version
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                # set amplifier type
+                self.name_amplifier = dlg.name_amp
                 return
 
             # update preferences
@@ -140,18 +153,12 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         except:
             # activating the device selection dialog
             dlg = DlgAmpTypeSelection()
-            ok = dlg.exec()
-
-            # ok == 1: selected amplifier type
-            # ok == 0: amplifier type not selected - exit the application
-            if ok:
-                self.name_amplifier = dlg.name_amp
-            else:
-                # add exit in application
-                QApplication.quit()
+            dlg.exec()
+            # set amplifier type
+            self.name_amplifier = dlg.name_amp
 
 
-    def save_preferences(self):
+    def savePreferences(self):
         """
         Save preferences to XML file
         :return:
@@ -284,8 +291,11 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.name_amp = ""
+
+        # default selected amplifier
         self.radioButton.setChecked(True)
+        self.name_amp = AMP_ActiChamp.__name__
+
         self.buttonBox.clicked.connect(self.set_name)
 
     def set_name(self):
@@ -301,13 +311,17 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
         res = QMessageBox.warning(
             self,
             "Warning!",
-            "Closing the window without an amplifier type selected "
-            "will close the PyCorderPlus application. Do you want to continue?",
+            "Amplifier type not selected. "
+            "The ActiCHamp Plus amplifier will be automatically selected. "
+            "Do you want to continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if res == QMessageBox.StandardButton.No:
             event.ignore()
+
+        if res == QMessageBox.StandardButton.Yes:
+            self.close()
 
 
 
