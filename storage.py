@@ -763,17 +763,16 @@ class StorageVision(ModuleBase):
                 ...
             </StorageVision>
         '''
-        # E = objectify.E
-        # cfg = E.StorageVision(E.d_path(self.default_path),
-        #                       E.d_autoname(self.default_autoname),
-        #                       E.d_prefix(self.default_prefix),
-        #                       E.d_numbersize(self.default_numbersize),
-        #                       E.mindiskspace(self.min_disk_space),
-        #                       version=str(self.xmlVersion),
-        #                       instance=str(self._instance),
-        #                       module="storage")
-        # return cfg
-        pass
+        E = objectify.E
+        cfg = E.StorageVision(E.d_path(self.default_path),
+                              E.d_autoname(self.default_autoname),
+                              E.d_prefix(self.default_prefix),
+                              E.d_numbersize(self.default_numbersize),
+                              E.mindiskspace(self.min_disk_space),
+                              version=str(self.xmlVersion),
+                              instance=str(self._instance),
+                              module="storage")
+        return cfg
 
     def setXML(self, xml):
         ''' Set module properties from XML configuration file

@@ -227,7 +227,20 @@ class FLT_Eeg(ModuleBase):
                 ...
             </EegFilter>
         """
-        pass
+        E = objectify.E
+        channels = E.channels()
+        for channel in self.params.channel_properties:
+            if channel.group != ChannelGroup.EEG:
+                channels.append(channel.getXML())
+        cfg = E.EegFilter(E.notch_frequency(self.notchFrequency),
+                          E.lp_global(self.lpGlobal),
+                          E.hp_global(self.hpGlobal),
+                          E.notch_global(self.notchGlobal),
+                          channels,
+                          version=str(self.xmlVersion),
+                          instance=str(self._instance),
+                          module="filter")
+        return cfg
 
     def setXML(self, xml):
         """
@@ -235,7 +248,41 @@ class FLT_Eeg(ModuleBase):
         @param xml: complete objectify XML configuration tree,
         module will search for matching values
         """
-        pass
+        # search my configuration data
+        storages = xml.xpath("//EegFilter[@module='filter' and @instance='%i']" % self._instance)
+        if len(storages) == 0:
+            # configuration data not found, set default values
+            self.notchFrequency = 50.0
+            return
+
+            # we should have only one instance from this type
+        cfg = storages[0]
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            self.notchFrequency = cfg.notch_frequency.pyval
+            if version > 1:
+                # get global filter values
+                self.notchGlobal = cfg.notch_global.pyval
+                self.lpGlobal = cfg.lp_global.pyval
+                self.hpGlobal = cfg.hp_global.pyval
+                # get single channel filter values
+                channel_properties = []
+                for idx, channel in enumerate(cfg.channels.iterchildren()):
+                    ch = EEG_ChannelProperties("")
+                    ch.setXML(channel)
+                    channel_properties.append(ch)
+                self.params.channel_properties = np.array(channel_properties)
+
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
 
 
 """

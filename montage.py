@@ -275,47 +275,46 @@ class MNT_Recording(ModuleBase):
         @param xml: complete objectify XML configuration tree,
         module will search for matching values
         """
-        # # reset everything to default values
-        # self.setDefault()
-        #
-        # # search my configuration data
-        # montage = xml.xpath("//MNT_Recording[@module='montage' and @instance='%i']" % self._instance)
-        # if len(montage) == 0:
-        #     return  # configuration data not found, proceed with defaults
-        #
-        # cfg = montage[0]  # we should have only one montage instance from this type
-        #
-        # # check version, has to be lower or equal than current version
-        # version = cfg.get("version")
-        # if (version is not None) or (int(version) > self.xmlVersion):
-        #     self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
-        #     return
-        # version = int(version)
-        #
-        # # get the values
-        # try:
-        #     # setup montage channel configuration from xml
-        #     self.montage.setXML(cfg)
-        # except Exception as e:
-        #     self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+        # reset everything to default values
+        self.setDefault()
+
+        # search my configuration data
+        montage = xml.xpath("//MNT_Recording[@module='montage' and @instance='%i']" % self._instance)
+        if len(montage) == 0:
+            return  # configuration data not found, proceed with defaults
+
+        cfg = montage[0]  # we should have only one montage instance from this type
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            # setup montage channel configuration from xml
+            self.montage.setXML(cfg)
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
         pass
 
     def getXML(self):
         """ Get module properties for XML configuration file.
         @return: objectify XML element
         """
-        # if not self._validateChannelLabels():
-        #     QMessageBox.critical(None, "PyCorder",
-        #                          "It is not possible to save a configuration that contains duplicate channel names.")
-        #     raise Exception("configuration contains duplicate channel names")
-        # E = objectify.E
-        # channels = self.montage.getXML()
-        # montage = E.MNT_Recording(channels,
-        #                           version=str(self.xmlVersion),
-        #                           instance=str(self._instance),
-        #                           module="montage")
-        # return montage
-        pass
+        if not self._validateChannelLabels():
+            QMessageBox.critical(None, "PyCorder",
+                                 "It is not possible to save a configuration that contains duplicate channel names.")
+            raise Exception("configuration contains duplicate channel names")
+        E = objectify.E
+        channels = self.montage.getXML()
+        montage = E.MNT_Recording(channels,
+                                  version=str(self.xmlVersion),
+                                  instance=str(self._instance),
+                                  module="montage")
+        return montage
 
 
 class Montage:
@@ -399,26 +398,24 @@ class Montage:
         @param xml: complete objectify XML configuration tree,
         module will search for matching values
         """
-        # self.reset()
-        # for chXML in xml.MontageChannels.iterchildren():
-        #     channel = EEG_ChannelProperties("")
-        #     channel.setXML(chXML)
-        #     self.add(channel)
-        pass
+        self.reset()
+        for chXML in xml.MontageChannels.iterchildren():
+            channel = EEG_ChannelProperties("")
+            channel.setXML(chXML)
+            self.add(channel)
 
     def getXML(self):
         """ Get module properties for XML configuration file.
         @return: objectify XML element
         """
-        # E = objectify.E
-        # channels = E.MontageChannels()
-        # for inputgroup in self.channel_dict.values():
-        #     for inputnr in inputgroup.values():
-        #         for channel in inputnr.values():
-        #             channels.append(channel.getXML())
-        # channels.attrib["version"] = str(self.xmlVersion)
-        # return channels
-        pass
+        E = objectify.E
+        channels = E.MontageChannels()
+        for inputgroup in self.channel_dict.values():
+            for inputnr in inputgroup.values():
+                for channel in inputnr.values():
+                    channels.append(channel.getXML())
+        channels.attrib["version"] = str(self.xmlVersion)
+        return channels
 
 
 """

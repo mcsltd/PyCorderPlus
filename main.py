@@ -1,5 +1,11 @@
+import re
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout
+import os
+
+from lxml import objectify, etree
+
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
+from PyQt6.QtCore import QDir
 
 """
 Import GUI resources.
@@ -7,15 +13,20 @@ Import GUI resources.
 
 from res import frmMain
 from res import frmMainConfiguration
+from res import frmDialogSelectAmp
 
 """
 Import and instantiate recording modules.
 """
+from modbase import *
+
 from amplifier import AMP_ActiChamp, Receiver
 from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
 from storage import StorageVision
+from trigger import TRG_Eeg
+from filter import FLT_Eeg
 
 
 def InstantiateModules():
@@ -29,7 +40,9 @@ def InstantiateModules():
     modules = [
         AMP_ActiChamp(),
         MNT_Recording(),
+        TRG_Eeg(),
         StorageVision(),
+        FLT_Eeg(),
         IMP_Display(),
         DISP_Scope(instance=0),
         # Receiver()
@@ -44,15 +57,28 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     """
 
     def __init__(self):
-        super().__init__()
 
+        super().__init__()
         self.setupUi(self)
 
         # menu actions
         self.actionQuit.triggered.connect(self.close)
+        self.actionLoad_Configuration.triggered.connect(self.loadConfiguration)
+        self.actionSave_Configuration.triggered.connect(self.saveConfiguration)
+        self.actionDefault_Configuration.triggered.connect(self.defaultConfiguration)
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
+        # preferences
+        self.application_name = "PyCorderPlus"
+        self.name_amplifier = ""
+        self.configuration_file = ""
+        self.configuration_dir = ""
+        self.log_dir = ""
+        self.loadPreferences()
+        self.recording_mode = -1
+        # self.usageConfirmed = False
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -86,6 +112,288 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 self.verticalLayout_OnlinePane.insertWidget(position, pane)
                 position += 1
 
+        # load configuration file
+        # try to load the last configuration file
+        try:
+            if len(self.configuration_file) > 0:
+                cfg = os.path.normpath(self.configuration_dir + '/' + self.configuration_file)
+                self._loadConfiguration(cfg)
+            else:
+                self.defaultConfiguration()
+        except:
+            pass
+
+        # update log text module info
+        # self.updateModuleInfo()
+
+        # update button states
+        self.updateUI()
+
+    def updateUI(self, isRunning=False):
+        """ Update user interface to reflect the recording state
+        """
+        if isRunning:
+            self.pushButtonConfiguration.setEnabled(False)
+            self.actionLoad_Configuration.setEnabled(False)
+            self.actionSave_Configuration.setEnabled(False)
+            self.actionQuit.setEnabled(False)
+            self.actionDefault_Configuration.setEnabled(False)
+        else:
+            self.pushButtonConfiguration.setEnabled(True)
+            self.actionLoad_Configuration.setEnabled(True)
+            self.actionSave_Configuration.setEnabled(True)
+            self.actionQuit.setEnabled(True)
+            self.actionDefault_Configuration.setEnabled(True)
+            # self.statusWidget.resetUtilization()
+
+    def defaultConfiguration(self):
+        """
+        Menu "Reset Configuration":
+        Set default values for all modules
+        """
+        # reset all modules
+        for module in flatten(self.modules):
+            module.setDefault()
+
+        # update module chain, starting from top module
+        self.topmodule.update_receivers()
+
+        # update status line
+        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info="default", status_field="Workspace"))
+
+    def loadConfiguration(self):
+        """ Menu "Load Configuration ...":
+        Load module configuration from XML file
+        """
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dlg.setNameFilter("Configuration files (*.xml)")
+        dlg.setDefaultSuffix("xml")
+        if len(self.configuration_dir) > 0:
+            dlg.setDirectory(self.configuration_dir)
+        dlg.selectFile(self.configuration_file)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # load configuration from XML file
+                self._loadConfiguration(file_name)
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.configuration_file = fn
+                self.configuration_dir = dir
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                self.processEvent(
+                    ModuleEvent(
+                        "Load Configuration",
+                        EventType.ERROR,
+                        tb + " -> %s " % file_name + str(e),
+                        severity=ErrorSeverity.NOTIFY
+                    )
+                )
+
+    def _loadConfiguration(self, filename):
+        """
+        Load module configuration from XML file
+        @param filename: Full qualified XML file name
+        """
+        ok = True
+        cfg = objectify.parse(filename)
+
+        # check application and version
+        app = cfg.xpath("//PyCorderPlus")
+
+        if (len(app) == 0) or (app[0].get("version") is None):
+            # configuration data not found
+            # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s is not a valid PyCorder configuration file"%(filename), severity=1))
+            ok = False
+
+        if ok:
+            version = app[0].get("version")
+            if cmpver(version, __version__, 2) > 0:
+                # wrong version
+                # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s wrong version %s > %s" % (filename, version, __version__), severity=ErrorSeverity.NOTIFY))
+                ok = False
+
+        # setup modules from configuration file
+        if ok:
+            for module in flatten(self.modules):
+                module.setXML(cfg)
+
+        # update module chain, starting from top module
+        self.topmodule.update_receivers()
+
+        # update status line
+        file_name, ext = os.path.splitext(os.path.split(filename)[1])
+        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
+
+    def saveConfiguration(self):
+        """
+        Menu "Save Configuration ...":
+        Save module configuration to XML file
+        """
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dlg.setNameFilter("Configuration files (*.xml)")
+        dlg.setDefaultSuffix("xml")
+        if len(self.configuration_dir) > 0:
+            dlg.setDirectory(self.configuration_dir)
+        dlg.selectFile(self.configuration_file)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # save configuration to XML
+                self._saveConfiguration(file_name)
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.configuration_file = fn
+                self.configuration_dir = dir
+                # update status line
+                fn, ext = os.path.splitext(os.path.split(file_name)[1])
+                self.processEvent(ModuleEvent("Application",
+                                              EventType.STATUS,
+                                              info=fn,
+                                              status_field="Workspace"))
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                self.processEvent(ModuleEvent("Save Configuration", EventType.ERROR,
+                                              tb + " -> %s " % file_name + str(e),
+                                              severity=ErrorSeverity.NOTIFY))
+
+    def _saveConfiguration(self, filename):
+        """ Save module configuration to XML file
+        @param filename: Full qualified XML file name
+        """
+        E = objectify.E
+        modules = E.modules()
+        # get configuration from each connected module
+        for module in flatten(self.modules):
+            cfg = module.getXML()
+            if cfg is not None:
+                modules.append(cfg)
+        # build complete configuration tree
+        root = E.PyCorderPlus(modules, version=__version__)
+        # write it to file
+        etree.ElementTree(root).write(filename, pretty_print=True, encoding="UTF-8")
+
+    def loadPreferences(self):
+        """
+        Load preferences from XML file
+        :return:
+        """
+        try:
+            # preferences will be stored to user home directory
+            homedir = QDir.home()
+            appdir = "." + self.application_name
+            if not homedir.cd(appdir):
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                self.name_amplifier = dlg.name_amp
+                return
+            filename = homedir.absoluteFilePath("preferences.xml")
+
+            # read XML file
+            cfg = objectify.parse(filename)
+            # check application and version
+            app = cfg.xpath("//PyCorderPlus")
+            if (len(app) == 0) or (app[0].get("version") is None):
+                # configuration data not found
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                # set amplifier type
+                self.name_amplifier = dlg.name_amp
+                return
+                # check version
+            version = app[0].get("version")
+
+            if cmpver(version, __version__, 2) > 0:
+                # wrong version
+                # activating the device selection dialog
+                dlg = DlgAmpTypeSelection()
+                dlg.exec()
+                # set amplifier type
+                self.name_amplifier = dlg.name_amp
+                return
+
+            # update preferences
+            preferences = app[0].preferences
+            self.configuration_dir = preferences.config_dir.pyval
+            self.configuration_file = preferences.config_file.pyval
+            self.name_amplifier = preferences.name_amplifier.pyval
+            self.log_dir = preferences.log_dir.pyval
+        except:
+            # activating the device selection dialog
+            dlg = DlgAmpTypeSelection()
+            dlg.exec()
+            # set amplifier type
+            self.name_amplifier = dlg.name_amp
+
+    def savePreferences(self):
+        """
+        Save preferences to XML file
+        :return:
+        """
+        E = objectify.E
+        preferences = E.preferences(E.config_dir(self.configuration_dir),
+                                    E.config_file(self.configuration_file),
+                                    E.name_amplifier(self.name_amplifier),
+                                    E.log_dir(self.log_dir))
+        root = E.PyCorderPlus(preferences, version=__version__)
+
+        # preferences will be stored to user home directory
+        try:
+            homedir = QDir.home()
+            appdir = "." + self.application_name
+            if not homedir.cd(appdir):
+                homedir.mkdir(appdir)
+                homedir.cd(appdir)
+            filename = homedir.absoluteFilePath("preferences.xml")
+            etree.ElementTree(root).write(filename, pretty_print=True, encoding="UTF-8")
+        except:
+            pass
+
+    def processEvent(self, event):
+        """
+        Process events from module chain
+        @param event: ModuleEvent object
+        Stop acquisition on errors with a severity > 1
+        """
+
+        # recording mode changed?
+        if event.type == EventType.STATUS:
+            if event.status_field == "Mode":
+                self.recording_mode = event.info
+                self.updateUI(isRunning=(event.info >= 0))
+                # self.updateModuleInfo()
+
+        # look for errors
+        if (event.type == EventType.ERROR) and (event.severity > 1):
+            self.topmodule.stop(force=True)
+        pass
+
+    def closeEvent(self, event):
+        """
+        Application wants to close, prevent closing if recording to file is still active
+        """
+        if not self.topmodule.query("Stop"):
+            event.ignore()
+        else:
+            self.topmodule.stop(force=True)
+            self.savePreferences()
+            # clean up modules
+            for module in flatten(self.modules):
+                module.terminate()
+            # terminate remote control server
+            # if self.RC != None:
+            #     self.RC.terminate()
+            event.accept()
+
     def configurationClicked(self):
         """ Configuration button clicked
         - Open configuration dialog and add configuration panes for each module in the
@@ -97,8 +405,8 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             if pane is not None:
                 dlg.addPane(pane)
         ok = dlg.exec()
-        # if ok:
-        # self.saveConfiguration()
+        if ok:
+            self.saveConfiguration()
 
     def defineModuleChain(self):
         """
@@ -154,6 +462,25 @@ Utilities.
 """
 
 
+def cmpver(a, b, n=3):
+    ''' Compare two version numbers
+    @param a: version number 1
+    @param b: version number 2
+    @param n: number of categories to compare
+    @return:  -1 if a<b, 0 if a=b, 1 if a>b
+    '''
+
+    def fixup(i):
+        try:
+            return int(i)
+        except ValueError:
+            return i
+
+    a = list(map(fixup, re.findall(r"\d+|\w+", a)))
+    b = list(map(fixup, re.findall(r"\d+|\w+", b)))
+    return (a[:n] > b[:n]) - (a[:n] < b[:n])
+
+
 def flatten(lst):
     """ Flatten a list containing lists or tuples
     """
@@ -165,15 +492,74 @@ def flatten(lst):
             yield elem
 
 
+"""
+Amplifier type selection window.
+"""
+
+from PyQt6.QtCore import QCoreApplication
+
+
+class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+        # default selected amplifier
+        self.radioButton.setChecked(True)
+        self.name_amp = AMP_ActiChamp.__name__
+
+        self.buttonBox.clicked.connect(self.set_name)
+
+    def set_name(self):
+        # set name
+        if self.radioButton.isChecked():
+            self.name_amp = AMP_ActiChamp.__name__
+
+        # chose amplifier neorec
+        if self.radioButton_2.isChecked():
+            self.name_amp = "AMP_NeoRec"
+
+    def closeEvent(self, event):
+        res = QMessageBox.warning(
+            self,
+            "Warning!",
+            "Amplifier type not selected. "
+            "The ActiCHamp Plus amplifier will be automatically selected. "
+            "Do you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if res == QMessageBox.StandardButton.No:
+            event.ignore()
+
+        if res == QMessageBox.StandardButton.Yes:
+            self.close()
+
+
+NAME_APPLICATION = "PyCorderPlus"
+__version__ = "0.0.0"
+
+
 def main(args):
     """
     Create and start up main application
     """
+
+    # configuration_dir, \
+    #     configuration_file, \
+    #     name_amplifier, log_dir = load_preferences()
+    #
+    # app = QApplication(sys.argv)
+    # dlg = DlgAmpTypeSelection()
+    # dlg.show()
+    # app.exec()
+    # del app
+    #
+    # name_amplifier = dlg.name_amp
+
     app = QApplication(sys.argv)
     win = MainWindow()
-
-    # win.showMaximized()
-    win.show()
+    win.showMaximized()
     app.exec()
 
 
