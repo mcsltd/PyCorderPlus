@@ -4,7 +4,7 @@ import os
 
 from lxml import objectify, etree
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
 from PyQt6.QtCore import QDir
 
 """
@@ -18,6 +18,8 @@ from res import frmDialogSelectAmp
 """
 Import and instantiate recording modules.
 """
+from modbase import *
+
 from amplifier import AMP_ActiChamp, Receiver
 from montage import MNT_Recording
 from display import DISP_Scope
@@ -57,6 +59,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # menu actions
         self.actionQuit.triggered.connect(self.close)
+        self.actionLoad_Configuration.triggered.connect(self.loadConfiguration)
+        self.actionSave_Configuration.triggered.connect(self.saveConfiguration)
+        self.actionDefault_Configuration.triggered.connect(self.defaultConfiguration)
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
@@ -152,6 +157,39 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # update status line
         # self.processEvent(ModuleEvent("Application", EventType.STATUS, info="default", status_field="Workspace"))
 
+    def loadConfiguration(self):
+        """ Menu "Load Configuration ...":
+        Load module configuration from XML file
+        """
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dlg.setNameFilter("Configuration files (*.xml)")
+        dlg.setDefaultSuffix("xml")
+        if len(self.configuration_dir) > 0:
+            dlg.setDirectory(self.configuration_dir)
+        dlg.selectFile(self.configuration_file)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # load configuration from XML file
+                self._loadConfiguration(file_name)
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.configuration_file = fn
+                self.configuration_dir = dir
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                self.processEvent(
+                    ModuleEvent(
+                        "Load Configuration",
+                        EventType.ERROR,
+                        tb + " -> %s " % file_name + str(e),
+                        severity=ErrorSeverity.NOTIFY
+                    )
+                )
+
     def _loadConfiguration(self, filename):
         """
         Load module configuration from XML file
@@ -185,6 +223,57 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 # update status line
                 file_name, ext = os.path.splitext(os.path.split(filename)[1])
                 # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
+
+    def saveConfiguration(self):
+        """
+        Menu "Save Configuration ...":
+        Save module configuration to XML file
+        """
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dlg.setNameFilter("Configuration files (*.xml)")
+        dlg.setDefaultSuffix("xml")
+        if len(self.configuration_dir) > 0:
+            dlg.setDirectory(self.configuration_dir)
+        dlg.selectFile(self.configuration_file)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # save configuration to XML
+                self._saveConfiguration(file_name)
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.configuration_file = fn
+                self.configuration_dir = dir
+                # update status line
+                fn, ext = os.path.splitext(os.path.split(file_name)[1])
+                self.processEvent(ModuleEvent("Application",
+                                              EventType.STATUS,
+                                              info=fn,
+                                              status_field="Workspace"))
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                self.processEvent(ModuleEvent("Save Configuration", EventType.ERROR, \
+                                              tb + " -> %s " % file_name + str(e),
+                                              severity=ErrorSeverity.NOTIFY))
+
+    def _saveConfiguration(self, filename):
+        """ Save module configuration to XML file
+        @param filename: Full qualified XML file name
+        """
+        E = objectify.E
+        modules = E.modules()
+        # get configuration from each connected module
+        for module in flatten(self.modules):
+            cfg = module.getXML()
+            if cfg != None:
+                modules.append(cfg)
+        # build complete configuration tree
+        root = E.PyCorderPlus(modules, version=__version__)
+        # write it to file
+        etree.ElementTree(root).write(filename, pretty_print=True, encoding="UTF-8")
 
     def loadPreferences(self):
         """
@@ -266,6 +355,25 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         except:
             pass
 
+    def processEvent(self, event):
+        """
+        Process events from module chain
+        @param event: ModuleEvent object
+        Stop acquisition on errors with a severity > 1
+        """
+
+        # recording mode changed?
+        if event.type == EventType.STATUS:
+            if event.status_field == "Mode":
+                self.recording_mode = event.info
+                self.updateUI(isRunning=(event.info >= 0))
+                # self.updateModuleInfo()
+
+        # look for errors
+        if (event.type == EventType.ERROR) and (event.severity > 1):
+            self.topmodule.stop(force=True)
+        pass
+
     def closeEvent(self, event):
         """
         Application wants to close, prevent closing if recording to file is still active
@@ -273,7 +381,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if not self.topmodule.query("Stop"):
             event.ignore()
         else:
-            self.topmodule.stop()
+            self.topmodule.stop(force=True)
             self.savePreferences()
             # clean up modules
             for module in flatten(self.modules):

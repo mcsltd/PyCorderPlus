@@ -362,6 +362,19 @@ class AMP_ActiChamp(ModuleBase):
         # ToDo: self.inputDevices.reset()
         self.update_receivers()
 
+    def stop(self, force=False):
+        """ Stop data acquisition
+        @param force: force stop without query
+        @return: True, if stop was accepted by attached modules
+        """
+        # ask attached modules for acceptance
+        if not force:
+            if not self.query("Stop"):
+                return False
+        # stop it
+        ModuleBase.stop(self)
+        return True
+
     def _set_default_filter(self):
         ''' set all filter properties to HW filter values
         '''
