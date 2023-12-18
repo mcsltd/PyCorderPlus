@@ -567,74 +567,72 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
                 ...
             </DISP_Scope>
         '''
-        # eeg_scale, aux_scale = self.online_cfg.get_groupscale()
-        # E = objectify.E
-        # cfg = E.DISP_Scope(E.timebase(self.online_cfg.get_timebase()),
-        #                    E.eegscale(eeg_scale),
-        #                    E.auxscale(aux_scale),
-        #                    E.groupsize(self.online_cfg.get_groupsize()),
-        #                    E.baseline(self.online_cfg.checkBoxBaseline.isChecked()),
-        #                    version=str(self.xmlVersion),
-        #                    instance=str(self._instance),
-        #                    module="display")
-        # return cfg
-        pass
+        eeg_scale, aux_scale = self.online_cfg.get_groupscale()
+        E = objectify.E
+        cfg = E.DISP_Scope(E.timebase(self.online_cfg.get_timebase()),
+                           E.eegscale(eeg_scale),
+                           E.auxscale(aux_scale),
+                           E.groupsize(self.online_cfg.get_groupsize()),
+                           E.baseline(self.online_cfg.checkBoxBaseline.isChecked()),
+                           version=str(self.xmlVersion),
+                           instance=str(self._instance),
+                           module="display")
+        return cfg
 
     def setXML(self, xml):
         ''' Set module properties from XML configuration file
         @param xml: complete objectify XML configuration tree,
         module will search for matching values
         '''
-        # # search my configuration data
-        # displays = xml.xpath("//DISP_Scope[@module='display' and @instance='%i']" % (self._instance))
-        # if len(displays) == 0:
-        #     # configuration data not found, leave everything unchanged
-        #     return
-        #
-        #     # we should have only one display instance from this type
-        # cfg = displays[0]
-        #
-        # # check version, has to be lower or equal than current version
-        # version = cfg.get("version")
-        # if (version == None) or (int(version) > self.xmlVersion):
-        #     self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
-        #     return
-        # version = int(version)
-        #
-        # # get the values
-        # try:
-        #     # set closest matching timebase
-        #     timebase = cfg.timebase.pyval
-        #     if version < 4:
-        #         timebase = float(timebase) * 10.0
-        #     self.timebase = self.online_cfg.set_timebase(timebase)
-        #
-        #     if version > 1:
-        #         # set closest matching scale
-        #         if version < 4:
-        #             eeg_scale = float(cfg.scale.pyval)
-        #             aux_scale = float(cfg.scale.pyval)
-        #         elif version < 5:
-        #             eeg_scale = cfg.scale.pyval
-        #             aux_scale = cfg.scale.pyval
-        #         else:
-        #             eeg_scale = cfg.eegscale.pyval
-        #             aux_scale = cfg.auxscale.pyval
-        #         self.setScale(self.online_cfg.set_scale(eeg_scale, aux_scale))
-        #
-        #         # set closest matching group size
-        #         size = cfg.groupsize.pyval
-        #         if version < 4:
-        #             size = float(size)
-        #         self.online_cfg.set_groupsize(size)
-        #
-        #     if version > 2:
-        #         # get baseline correction flag
-        #         self.online_cfg.checkBoxBaseline.setChecked(cfg.baseline.pyval)
-        #
-        # except Exception as e:
-        #     self.send_exception(e, severity=ErrorSeverity.NOTIFY)
-        pass
+        # search my configuration data
+        displays = xml.xpath("//DISP_Scope[@module='display' and @instance='%i']" % self._instance)
+        if len(displays) == 0:
+            # configuration data not found, leave everything unchanged
+            return
+
+            # we should have only one display instance from this type
+        cfg = displays[0]
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            # set closest matching timebase
+            timebase = cfg.timebase.pyval
+            if version < 4:
+                timebase = float(timebase) * 10.0
+            self.timebase = self.online_cfg.set_timebase(timebase)
+
+            if version > 1:
+                # set closest matching scale
+                if version < 4:
+                    eeg_scale = float(cfg.scale.pyval)
+                    aux_scale = float(cfg.scale.pyval)
+                elif version < 5:
+                    eeg_scale = cfg.scale.pyval
+                    aux_scale = cfg.scale.pyval
+                else:
+                    eeg_scale = cfg.eegscale.pyval
+                    aux_scale = cfg.auxscale.pyval
+                self.setScale(self.online_cfg.set_scale(eeg_scale, aux_scale))
+
+                # set closest matching group size
+                size = cfg.groupsize.pyval
+                if version < 4:
+                    size = float(size)
+                self.online_cfg.set_groupsize(size)
+
+            if version > 2:
+                # get baseline correction flag
+                self.online_cfg.checkBoxBaseline.setChecked(cfg.baseline.pyval)
+
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
 
 
 class _ScopeLegend(Qwt.QwtLegend):
@@ -763,6 +761,12 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         """
         time = self.comboBoxTime.itemData(self.comboBoxTime.currentIndex())
         return time
+
+    def get_groupscale(self):
+        """ Get scale values for EEG and AUX channels
+        @return: float EEG and AUX scale
+        """
+        return self.eeg_scale, self.aux_scale
 
     def _groupsChanged(self, value):
         """

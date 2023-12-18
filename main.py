@@ -25,6 +25,8 @@ from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
 from storage import StorageVision
+from trigger import TRG_Eeg
+from filter import FLT_Eeg
 
 
 def InstantiateModules():
@@ -38,7 +40,9 @@ def InstantiateModules():
     modules = [
         AMP_ActiChamp(),
         MNT_Recording(),
+        TRG_Eeg(),
         StorageVision(),
+        FLT_Eeg(),
         IMP_Display(),
         DISP_Scope(instance=0),
         # Receiver()
@@ -401,8 +405,8 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             if pane is not None:
                 dlg.addPane(pane)
         ok = dlg.exec()
-        # if ok:
-        # self.saveConfiguration()
+        if ok:
+            self.saveConfiguration()
 
     def defineModuleChain(self):
         """

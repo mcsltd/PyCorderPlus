@@ -172,14 +172,13 @@ class IMP_Display(ModuleBase):
                 ...
             </IMP_Display>
         """
-        # E = objectify.E
-        # cfg = E.IMP_Display(E.range_max(self.range_max),
-        #                     E.show_values(self.show_values),
-        #                     version=str(self.xmlVersion),
-        #                     instance=str(self._instance),
-        #                     module="impedance")
-        # return cfg
-        pass
+        E = objectify.E
+        cfg = E.IMP_Display(E.range_max(self.range_max),
+                            E.show_values(self.show_values),
+                            version=str(self.xmlVersion),
+                            instance=str(self._instance),
+                            module="impedance")
+        return cfg
 
     def setXML(self, xml):
         """
@@ -187,29 +186,28 @@ class IMP_Display(ModuleBase):
         @param xml: complete objectify XML configuration tree,
         module will search for matching values
         """
-        # # search my configuration data
-        # displays = xml.xpath("//IMP_Display[@module='impedance' and @instance='%i']" % self._instance)
-        # if len(displays) == 0:
-        #     # configuration data not found, leave everything unchanged
-        #     return
-        #
-        #     # we should have only one display instance from this type
-        # cfg = displays[0]
-        #
-        # # check version, has to be lower or equal than current version
-        # version = cfg.get("version")
-        # if (version is None) or (int(version) > self.xmlVersion):
-        #     self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
-        #     return
-        # version = int(version)
-        #
-        # # get the values
-        # try:
-        #     self.range_max = cfg.range_max.pyval
-        #     self.show_values = cfg.show_values.pyval
-        # except Exception as e:
-        #     self.send_exception(e, severity=ErrorSeverity.NOTIFY)
-        pass
+        # search my configuration data
+        displays = xml.xpath("//IMP_Display[@module='impedance' and @instance='%i']" % self._instance)
+        if len(displays) == 0:
+            # configuration data not found, leave everything unchanged
+            return
+
+            # we should have only one display instance from this type
+        cfg = displays[0]
+
+        # check version, has to be lower or equal than current version
+        version = cfg.get("version")
+        if (version is None) or (int(version) > self.xmlVersion):
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
+            return
+        version = int(version)
+
+        # get the values
+        try:
+            self.range_max = cfg.range_max.pyval
+            self.show_values = cfg.show_values.pyval
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
 
 
 """
