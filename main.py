@@ -25,7 +25,6 @@ from impedance import IMP_Display
 from storage import StorageVision
 
 
-
 def InstantiateModules():
     """
     Instantiate and arrange module objects.
@@ -135,6 +134,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 return
                 # check version
             version = app[0].get("version")
+
+            flag = cmpver(version, __version__, 2)
+            c = 1
             if cmpver(version, __version__, 2) > 0:
                 # wrong version
                 # activating the device selection dialog
@@ -157,15 +159,14 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # set amplifier type
             self.name_amplifier = dlg.name_amp
 
-
     def savePreferences(self):
         """
         Save preferences to XML file
         :return:
         """
         E = objectify.E
-        preferences = E.preferences(E.config_dir(self.config_dir),
-                                    E.config_file(self.config_file),
+        preferences = E.preferences(E.config_dir(self.configuration_dir),
+                                    E.config_file(self.configuration_file),
                                     E.name_amplifier(self.name_amplifier),
                                     E.log_dir(self.log_dir))
         root = E.PyCorderPlus(preferences, version=__version__)
@@ -173,7 +174,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # preferences will be stored to user home directory
         try:
             homedir = QDir.home()
-            appdir = "." + NAME_APPLICATION
+            appdir = "." + self.application_name
             if not homedir.cd(appdir):
                 homedir.mkdir(appdir)
                 homedir.cd(appdir)
@@ -181,6 +182,23 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             etree.ElementTree(root).write(filename, pretty_print=True, encoding="UTF-8")
         except:
             pass
+
+    def closeEvent(self, event):
+        """
+        Application wants to close, prevent closing if recording to file is still active
+        """
+        if not self.topmodule.query("Stop"):
+            event.ignore()
+        else:
+            self.topmodule.stop()
+            self.savePreferences()
+            # clean up modules
+            for module in flatten(self.modules):
+                module.terminate()
+            # terminate remote control server
+            # if self.RC != None:
+            #     self.RC.terminate()
+            event.accept()
 
     def configurationClicked(self):
         """ Configuration button clicked
@@ -251,22 +269,20 @@ Utilities.
 
 
 def cmpver(a, b, n=3):
-    """ Compare two version numbers
+    ''' Compare two version numbers
     @param a: version number 1
     @param b: version number 2
     @param n: number of categories to compare
     @return:  -1 if a<b, 0 if a=b, 1 if a>b
-    """
-
+    '''
     def fixup(i):
         try:
             return int(i)
         except ValueError:
             return i
-
-    a = map(fixup, re.findall("\d+|\w+", a))
-    b = map(fixup, re.findall("\d+|\w+", b))
-    return cmp(a[:n], b[:n])
+    a = list(map(fixup, re.findall(r"\d+|\w+", a)))
+    b = list(map(fixup, re.findall(r"\d+|\w+", b)))
+    return (a[:n] > b[:n]) - (a[:n] < b[:n])
 
 
 def flatten(lst):
@@ -322,7 +338,6 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
 
         if res == QMessageBox.StandardButton.Yes:
             self.close()
-
 
 
 NAME_APPLICATION = "PyCorderPlus"
