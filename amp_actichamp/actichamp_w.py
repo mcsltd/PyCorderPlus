@@ -466,11 +466,11 @@ class ActiChamp:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll"
+                path = r"amp_actichamp/ActiChamp_x64.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
                 self.lib.champOpen.restype = ctypes.c_uint64
             else:
-                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll"
+                path = r"amp_actichamp/ActiChamp_x86.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
         except:
             self.lib = None
@@ -648,10 +648,10 @@ class ActiChamp:
         try:
             ini = configparser.ConfigParser()
             if self.x64:
-                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll.ini"
+                filename = r"amp_actichamp/ActiChamp_x64.dll.ini"
                 # filename = "ActiChamp_x64.dll.ini"
             else:
-                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll.ini"
+                filename = r"amp_actichamp/ActiChamp_x86.dll.ini"
                 # filename = "ActiChamp_x86.dll.ini"
 
             if len(ini.read(filename)) > 0:

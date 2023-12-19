@@ -1,8 +1,4 @@
 import re
-import sys
-import os
-
-from lxml import objectify, etree
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
 from PyQt6.QtCore import QDir
@@ -20,7 +16,7 @@ Import and instantiate recording modules.
 """
 from modbase import *
 
-from amplifier import AMP_ActiChamp, Receiver
+from amp_actichamp.amplifier import AMP_ActiChamp
 from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
@@ -496,8 +492,6 @@ def flatten(lst):
 Amplifier type selection window.
 """
 
-from PyQt6.QtCore import QCoreApplication
-
 
 class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
     def __init__(self):
@@ -554,7 +548,6 @@ def main(args):
     # dlg.show()
     # app.exec()
     # del app
-    #
     # name_amplifier = dlg.name_amp
 
     app = QApplication(sys.argv)
@@ -562,6 +555,10 @@ def main(args):
     win.showMaximized()
     app.exec()
 
+    # import pkgutil
+    # search_path = ['.']
+    # all_modules = [x[1] for x in pkgutil.iter_modules(path=search_path)]
+    # print(all_modules)
 
 if __name__ == "__main__":
     main(sys.argv)

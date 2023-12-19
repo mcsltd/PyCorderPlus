@@ -45,7 +45,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 
 from modbase import *
-from actichamp_w import *
+from amp_actichamp.actichamp_w import *
 
 from res import frmActiChampOnline
 
