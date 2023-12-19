@@ -69,12 +69,12 @@ AMPLIFIER MODULE
 
 
 class AMP_ActiChamp(ModuleBase):
-    ''' ActiChamp EEG amplifier module
-    '''
+    """ ActiChamp EEG amplifier module
+    """
 
     def __init__(self, *args, **keys):
-        ''' Constructor
-        '''
+        """ Constructor
+        """
         super().__init__(self, name="Amplifier", **keys)
 
         # XML parameter version
