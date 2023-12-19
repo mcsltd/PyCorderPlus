@@ -10,6 +10,24 @@ NR_RATE_250HZ = 1
 NR_RATE_500HZ = 2
 NR_RATE_1000HZ = 3
 
+# sample rate freq. dictionary
+sample_rate = {
+    NR_RATE_125HZ: 125.0,
+    NR_RATE_250HZ: 250.0,
+    NR_RATE_500HZ: 500.0,
+    NR_RATE_1000HZ: 1000.0,
+}
+
+# adc input rage in mV enum
+NR_RANGE_mV150 = 0
+NR_RANGE_mV300 = 1
+
+# adc input dictionary
+dynamic_range = {
+    150.0: NR_RANGE_mV150,
+    300.0: NR_RANGE_mV300
+}
+
 # C error numbers
 NR_ERR_OK = 0  # Success (no errors)
 NR_ERR_ID = -1  # Invalid id
@@ -60,6 +78,30 @@ class t_nb2DataStatus(ctypes.Structure):
     ]
 
 
+class t_nb2Possibility(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("ChannelsCount", ctypes.c_uint32),
+        ("UserMemorySize", ctypes.c_uint32),
+    ]
+
+
+class t_nb2Settings(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('DataRate', ctypes.c_uint8),
+        ('InputRange', ctypes.c_uint8),
+        ('EnabledChannels', ctypes.c_uint32)
+    ]
+
+
+class t_nb2Mode(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("Mode", ctypes.c_uint8)
+    ]
+
+
 # channel names for NeoRec 21 and NeoRec21S devices
 NR_NAME_CHANNEL_EEG21 = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3",
                          "P4", "O1", "O2", "F7", "F8", "T3", "T4",
@@ -75,7 +117,7 @@ class NeoRec:
         # get OS architecture (64-bit)
         self.x64 = ("64" in platform.architecture()[0])
 
-        self.id = None  # Device id
+        self.id = 0  # Device id
 
         self.open_ble = False  # BLE device connected
         self.running = False  # Data acquisition running
@@ -83,6 +125,19 @@ class NeoRec:
 
         # info has Model, SerialNumber, ProductionDate
         self.info = t_nb2Information()
+
+        # set default properties
+        self.properties = t_nb2Settings()
+        self.properties.DataRate = NR_RATE_125HZ  #: sampling rate
+        self.properties.InputRange = NR_RANGE_mV150  #: input range
+        self.properties.EnabledChannels = 0x001FFFFF  #: enabled channels
+
+        # set default mode
+        self.mode = t_nb2Mode()  #: NeoRecCap settings mode structure
+        self.mode.Mode = NR_MODE_DATA
+
+        self.CountEeg = 21
+        self.CountAux = 0
 
         # load NeoRec windows library
         self.lib = None
@@ -151,12 +206,70 @@ class NeoRec:
         if err != NR_ERR_OK:
             pass
 
-    pass
+    def stop(self):
+        """
+        Stop data acquisition
+        """
+        if not self.running:
+            return
+        self.running = False
+        if self.id is None:
+            # raise AmpError("device not open")
+            pass
+        err = self.lib.nb2Stop(self.id)
+        if err != NR_ERR_OK:
+            # raise AmpError("failed to stop device", err)
+            pass
 
+    def close(self):
+        """
+        Close hardware device
+        """
+        if self.lib is None:
+            # raise AmpError("library ActiChamp_x86.dll not available")
+            return
+
+        if self.id != 0:
+
+            if self.running:
+                self.stop()
+
+            err = self.lib.nb2Close(self.id)
+
+            if err == NR_ERR_OK:
+                self.lib.nb2ApiDone()
+
+    def getSamplingRateBase(self, samplingrate):
+        ''' Get base sampling rate ID and divider for the requested sampling rate
+        @param samplingrate: requested sampling rate in Hz
+        @return: base rate ID (-1 if not possible) and base rate divider
+        '''
+        mindiv = 100000
+        base = -1
+        div = 1
+        for sr in sample_rate:
+            div = sample_rate[sr] / samplingrate
+            if int(div) == div:
+                if div < mindiv:
+                    mindiv = div
+                    base = sr
+        if base >= 0:
+            div = int(sample_rate[base] / samplingrate)
+        return base, div
+
+    def getDynamicRangeBase(self, range):
+        """
+        Get base sampling rate ID and divider for the requested sampling rate
+        :param range: Numeric range value
+        :return range number in the dictionary
+        """
+        base = -1
+        if range in dynamic_range:
+            base = dynamic_range[range]
+        return base
 
 # if __name__ == "__main__":
 #     obj = NeoRec()
 #     print(obj.info.Model)
 #     obj.open()
 #     print(obj.info.Model)
-

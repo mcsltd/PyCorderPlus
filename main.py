@@ -17,6 +17,7 @@ Import and instantiate recording modules.
 from modbase import *
 
 from amp_actichamp.amplifier import AMP_ActiChamp
+from amp_neorec.amplifier import AMP_NeoRec
 from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
@@ -25,7 +26,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 
-def InstantiateModules():
+def InstantiateModules(name_amp):
     """
     Instantiate and arrange module objects.
     Modules will be connected top -> down, starting with array index 0.
@@ -43,6 +44,30 @@ def InstantiateModules():
         DISP_Scope(instance=0),
         # Receiver()
     ]
+
+    if name_amp == AMP_ActiChamp.__name__:
+        modules = [
+            AMP_ActiChamp(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
+    elif name_amp == AMP_NeoRec.__name__:
+        modules = [
+            AMP_NeoRec(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
+
     return modules
 
 
@@ -459,12 +484,12 @@ Utilities.
 
 
 def cmpver(a, b, n=3):
-    ''' Compare two version numbers
+    """ Compare two version numbers
     @param a: version number 1
     @param b: version number 2
     @param n: number of categories to compare
     @return:  -1 if a<b, 0 if a=b, 1 if a>b
-    '''
+    """
 
     def fixup(i):
         try:
@@ -559,6 +584,7 @@ def main(args):
     # search_path = ['.']
     # all_modules = [x[1] for x in pkgutil.iter_modules(path=search_path)]
     # print(all_modules)
+
 
 if __name__ == "__main__":
     main(sys.argv)
