@@ -2,12 +2,87 @@ import ctypes
 import ctypes.wintypes
 import _ctypes
 import platform
+import time
+
+# NeoRec base sample rate enum
+NR_RATE_125HZ = 0
+NR_RATE_250HZ = 1
+NR_RATE_500HZ = 2
+NR_RATE_1000HZ = 3
+
+# C error numbers
+NR_ERR_OK = 0  # Success (no errors)
+NR_ERR_ID = -1  # Invalid id
+NR_ERR_FAIL = -2  # Operation failed
+NR_ERR_PARAM = -3  # Incorrect argument
+NR_ERR_OBTAINED = -4  # Error receiving data from device
+NR_ERR_SUPPORT = -5  # Function is not defined for the connected device
+
+# program working mode enum
+NR_MODE_DATA = 0
+NR_MODE_IMPEDANCE = 1
+
+
+class t_nb2Date(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('Year', ctypes.c_uint16),
+        ('Month', ctypes.c_uint8),
+        ('Day', ctypes.c_uint8)
+    ]
+
+
+class t_nb2Information(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('Model', ctypes.c_uint32),
+        ('SerialNumber', ctypes.c_uint32),
+        ('ProductionDate', t_nb2Date)
+    ]
+
+
+class t_nb2Property(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("Rate", ctypes.c_float),
+        ("Resolution", ctypes.c_float),
+        ("Range", ctypes.c_float)
+    ]
+
+
+class t_nb2DataStatus(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("Rate", ctypes.c_float),
+        ("Speed", ctypes.c_float),
+        ("Ratio", ctypes.c_float),
+        ("Utilization", ctypes.c_float),
+    ]
+
+
+# channel names for NeoRec 21 and NeoRec21S devices
+NR_NAME_CHANNEL_EEG21 = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3",
+                         "P4", "O1", "O2", "F7", "F8", "T3", "T4",
+                         "T5", "T6", "A1", "A2", "Fz", "Cz", "Pz"]
+
+NR_NAME_CHANNEL_EEG21S = ["C4", "A2", "F8", "T6", "F4", "P4", "Fp2",
+                          "O2", "Cz", "Pz", "Fz", "O1", "Fp1", "P3",
+                          "F3", "T5", "F7", "A1", "C3", "T3", "T4"]
 
 
 class NeoRec:
     def __init__(self):
-        # get OS architecture (32/64-bit)
+        # get OS architecture (64-bit)
         self.x64 = ("64" in platform.architecture()[0])
+
+        self.id = None  # Device id
+
+        self.open_ble = False  # BLE device connected
+        self.running = False  # Data acquisition running
+        self.model = None
+
+        # info has Model, SerialNumber, ProductionDate
+        self.info = t_nb2Information()
 
         # load NeoRec windows library
         self.lib = None
@@ -17,22 +92,71 @@ class NeoRec:
         """
         Load windows library
         """
-        # load ActiChamp 32 or 64 bit windows library
+        # load NeoRec 64 bit windows library
         try:
             # unload existing library
             if self.lib is not None:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                self.lib = ctypes.windll.LoadLibrary("amp_neorec/nb2mcs.dll")
+                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\amp_neorec\nb2mcs.dll"
+                self.lib = ctypes.windll.LoadLibrary(path)
         except:
             self.lib = None
             if self.x64:
                 # raise AmpError("failed to open library (ActiChamp_x64.dll)")
                 pass
 
+        # initialization library resources
+        res = self.lib.nb2ApiInit()
+        if res != NR_ERR_OK:
+            # AmpError("can't initialize library resources")
+            pass
+
+    def searchDevice(self):
+        """
+        Search device and recieve count device
+        @return count: count of devices found
+        """
+        # returns the number of devices
+        count = self.lib.nb2GetCount()
+        time.sleep(0.01)
+        return count
+
+    def open(self):
+        """
+        Open the hardware device
+        @return res: result of opening the device
+        """
+        if self.running:
+            return
+        if self.lib is None:
+            # raise AmpError("library nb2mcs.dll not available")
+            return
+
+        while not self.open_ble:
+            # get the number of devices on the network
+            c = self.lib.nb2GetCount()
+            if c > 0:
+                # get index device with number 1
+                self.id = self.lib.nb2GetId(0)
+                # open this device
+                err = self.lib.nb2Open(self.id)
+                if err != NR_ERR_OK:
+                    self.open_ble = True
+
+        # get information about open device
+        err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
+
+        if err != NR_ERR_OK:
+            pass
+
     pass
 
 
-if __name__ == "__main__":
-    obj = NeoRec()
+# if __name__ == "__main__":
+#     obj = NeoRec()
+#     print(obj.info.Model)
+#     obj.open()
+#     print(obj.info.Model)
+
