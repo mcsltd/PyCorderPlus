@@ -119,7 +119,7 @@ CHAMP_RATE_500HZ = 14  # 500 Hz
 CHAMP_RATE_200HZ = 15  # 200 Hz
 
 # sample rate frequency dictionary (amplifier DLL base frequencies available for the application)
-# if you want to do the decimation and filtering in Python (amplifier.py) then
+# if you want to do the decimation and filtering in Python (amplifier_neorec.py) then
 # set this value to True:
 PythonDecimation = False
 if PythonDecimation:

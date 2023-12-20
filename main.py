@@ -1,7 +1,9 @@
 import re
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
-from PyQt6.QtCore import QDir
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
+    QVBoxLayout, QLabel
+from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtCore import QDir, pyqtSignal, QThread
 
 """
 Import GUI resources.
@@ -10,14 +12,15 @@ Import GUI resources.
 from res import frmMain
 from res import frmMainConfiguration
 from res import frmDialogSelectAmp
+from res import frmDlgNeoRecConnection
 
 """
 Import and instantiate recording modules.
 """
 from modbase import *
 
-from amp_actichamp.amplifier import AMP_ActiChamp
-from amp_neorec.amplifier import AMP_NeoRec
+from amp_actichamp.amplifier_actichamp import AMP_ActiChamp
+from amp_neorec.amplifier_neorec import AMP_NeoRec
 from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
@@ -26,7 +29,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 
-def InstantiateModules(name_amp):
+def InstantiateModules():
     """
     Instantiate and arrange module objects.
     Modules will be connected top -> down, starting with array index 0.
@@ -35,7 +38,8 @@ def InstantiateModules(name_amp):
     """
     # test modules for control amplifier
     modules = [
-        AMP_ActiChamp(),
+        # AMP_ActiChamp(),
+        AMP_NeoRec(),
         MNT_Recording(),
         TRG_Eeg(),
         StorageVision(),
@@ -45,28 +49,28 @@ def InstantiateModules(name_amp):
         # Receiver()
     ]
 
-    if name_amp == AMP_ActiChamp.__name__:
-        modules = [
-            AMP_ActiChamp(),
-            MNT_Recording(),
-            TRG_Eeg(),
-            StorageVision(),
-            FLT_Eeg(),
-            IMP_Display(),
-            DISP_Scope(instance=0),
-            # Receiver()
-        ]
-    elif name_amp == AMP_NeoRec.__name__:
-        modules = [
-            AMP_NeoRec(),
-            MNT_Recording(),
-            TRG_Eeg(),
-            StorageVision(),
-            FLT_Eeg(),
-            IMP_Display(),
-            DISP_Scope(instance=0),
-            # Receiver()
-        ]
+    # if name_amp == AMP_ActiChamp.__name__:
+    #     modules = [
+    #         AMP_ActiChamp(),
+    #         MNT_Recording(),
+    #         TRG_Eeg(),
+    #         StorageVision(),
+    #         FLT_Eeg(),
+    #         IMP_Display(),
+    #         DISP_Scope(instance=0),
+    #         # Receiver()
+    #     ]
+    # elif name_amp == AMP_NeoRec.__name__:
+    #     modules = [
+    #         AMP_NeoRec(),
+    #         MNT_Recording(),
+    #         TRG_Eeg(),
+    #         StorageVision(),
+    #         FLT_Eeg(),
+    #         IMP_Display(),
+    #         DISP_Scope(instance=0),
+    #         # Receiver()
+    #     ]
 
     return modules
 
@@ -111,6 +115,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get the top module
         self.topmodule = self.modules[0]
 
+        # get name class Amplifier
+        if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
+            dlg = DlgConnectionNeoRec(self)
+            dlg.exec()
+
         # get the bottom module
         self.bottommodule = self.modules[-1]
 
@@ -149,6 +158,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # update button states
         self.updateUI()
+
+    def neorec_search(self):
+        """
+        Launching the NeoRec amplifier search window on the network
+        :return:
+        """
+        pass
 
     def updateUI(self, isRunning=False):
         """ Update user interface to reflect the recording state
@@ -436,6 +452,34 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         - Additional modules can be connected left -> right with tuples as list objects
         """
         self.modules = InstantiateModules()
+
+
+"""
+NeoRec amplifier search window
+"""
+
+
+class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self.setupUi(self)
+        self.setWindowTitle("Connection to Amplifier")
+
+        self.label.setPixmap(QPixmap("res/press_button.png"))
+
+        self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
+        self.label_2.setFont(QFont("Ms Shell Dlg 2", 8))
+
+    def closeEvent(self, event):
+        result = QMessageBox.question(self, "Window close confirmation",
+                                      "Are you sure you want to close the window and stop searching for NeoRec devices?",
+                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                      QMessageBox.StandardButton.No)
+        if result == QMessageBox.StandardButton.Yes:
+            self.close()
+        else:
+            event.ignore()
 
 
 '''
