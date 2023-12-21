@@ -168,16 +168,6 @@ class NeoRec:
             # AmpError("can't initialize library resources")
             pass
 
-    def searchDevice(self):
-        """
-        Search device and recieve count device
-        @return count: count of devices found
-        """
-        # returns the number of devices
-        count = self.lib.nb2GetCount()
-        time.sleep(0.01)
-        return count
-
     def open(self):
         """
         Open the hardware device
@@ -205,6 +195,8 @@ class NeoRec:
 
         if err != NR_ERR_OK:
             pass
+
+        return err
 
     def stop(self):
         """

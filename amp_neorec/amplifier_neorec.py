@@ -2,6 +2,11 @@ from modbase import *
 from amp_neorec.neorec import *
 from scipy import signal
 
+from res import frmNeoRecOnline
+
+from PyQt6.QtWidgets import (QFrame, QApplication)
+from PyQt6.QtCore import pyqtSignal
+
 
 class AMP_NeoRec(ModuleBase):
     """
@@ -52,6 +57,10 @@ class AMP_NeoRec(ModuleBase):
         self.battery_timer = time.process_time()
         self.voltage_warning = ""
 
+        # create online configuration pane
+        self.online_cfg = _OnlineCfgPane(self)
+        self.online_cfg.modeChanged.connect(self._online_mode_changed)
+
         # skip the first received data blocks
         self.skip_counter = 5
         self.blocking_counter = 0
@@ -60,6 +69,11 @@ class AMP_NeoRec(ModuleBase):
         self.initialErrorCount = -1
         self.acquisitionTimeoutCounter = 0
         self.test_counter = 0
+
+    def get_online_configuration(self):
+        """ Get the online configuration pane
+        """
+        return self.online_cfg
 
     def _create_all_channel_selection(self):
         """
@@ -122,11 +136,69 @@ class AMP_NeoRec(ModuleBase):
         """ set all filter properties to HW filter values
         """
         for channel in self.channel_config:
-            channel.highpass = 0.0                  # high pass off
-            channel.lowpass = 0.0                   # low pass off
-            channel.notchfilter = False             # notch filter off
+            channel.highpass = 0.0  # high pass off
+            channel.lowpass = 0.0  # low pass off
+            channel.notchfilter = False  # notch filter off
+
+    def _online_mode_changed(self, new_mode):
+        """ SIGNAL from online configuration pane if recording mode has changed
+        """
+        if self.amp.running:
+            if not self.stop():
+                self.online_cfg.updateUI(self.recording_mode)
+                return
+
+        if new_mode >= 0:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            self.recording_mode = new_mode
+            self.start()
+            QApplication.restoreOverrideCursor()
+
+"""
+Amplifier NeoRec module online GUI.
+"""
 
 
+class _OnlineCfgPane(QFrame, frmNeoRecOnline.Ui_frmNeoRecOnline):
+    """
+    NeoRec online configuration pane
+    """
+
+    modeChanged = pyqtSignal(int)
+
+    def __init__(self, amp, *args):
+        super().__init__(*args)
+        self.setupUi(self)
+        self.amp = amp
+
+        # set default values
+        self.pushButtonStop.setChecked(True)
+
+        # actions
+        self.pushButtonStartDefault.clicked.connect(self._button_toggle)
+        self.pushButtonStartImpedance.clicked.connect(self._button_toggle)
+        self.pushButtonStop.clicked.connect(self._button_toggle)
+
+    def _button_toggle(self, checked):
+        """ SIGNAL if one of the push buttons is clicked
+        """
+        if checked:
+            mode = -1  # stop
+            if self.pushButtonStartDefault.isChecked():
+                mode = NR_MODE_DATA
+            elif self.pushButtonStartImpedance.isChecked():
+                mode = NR_MODE_IMPEDANCE
+            self.modeChanged.emit(mode)
+
+    def updateUI(self, mode):
+        """ Update user interface according to recording mode
+        """
+        if mode == NR_MODE_DATA:
+            self.pushButtonStartDefault.setChecked(True)
+        elif mode == NR_MODE_IMPEDANCE:
+            self.pushButtonStartImpedance.setChecked(True)
+        else:
+            self.pushButtonStop.setChecked(True)
 
 if __name__ == "__main__":
     obj = AMP_NeoRec()
