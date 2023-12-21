@@ -102,6 +102,14 @@ class t_nb2Mode(ctypes.Structure):
     ]
 
 
+class t_nb2EventSettings(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('EnabledEvents', ctypes.c_uint16),
+        ('ActivityThreshold', ctypes.c_uint16)
+    ]
+
+
 # channel names for NeoRec 21 and NeoRec21S devices
 NR_NAME_CHANNEL_EEG21 = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3",
                          "P4", "O1", "O2", "F7", "F8", "T3", "T4",
@@ -127,14 +135,19 @@ class NeoRec:
         self.info = t_nb2Information()
 
         # set default properties
-        self.properties = t_nb2Settings()
-        self.properties.DataRate = NR_RATE_125HZ  #: sampling rate
-        self.properties.InputRange = NR_RANGE_mV150  #: input range
-        self.properties.EnabledChannels = 0x001FFFFF  #: enabled channels
+        self.settings = t_nb2Settings()
+        self.settings.DataRate = NR_RATE_125HZ  #: sampling rate
+        self.settings.InputRange = NR_RANGE_mV150  #: input range
+        self.settings.EnabledChannels = 0x001FFFFF  #: enabled channels
 
         # set default mode
         self.mode = t_nb2Mode()  #: NeoRecCap settings mode structure
         self.mode.Mode = NR_MODE_DATA
+
+        # set event settings
+        self.eset = t_nb2EventSettings()
+        self.eset.EnabledEvents = 0x003F
+        self.eset.ActivityThreshold = 0
 
         self.CountEeg = 21
         self.CountAux = 0
@@ -259,6 +272,59 @@ class NeoRec:
         if range in dynamic_range:
             base = dynamic_range[range]
         return base
+
+    def readConfiguration(self, rate, range, force=False):
+        """
+        Update device sampling rate, dymamic range and get new configuration
+        @param rate: device base sampling rate
+        :param force:
+        :param range:
+        """
+        # not possible if device is already open or not necessary if rate or range has not changed
+        if (self.id != 0 or rate == self.settings.DataRate or range == self.settings.InputRange) and not force:
+            return
+        # update sampling rate and get new configuration
+        try:
+            self.setup(self.mode.Mode, rate, range)
+        except:
+            pass
+
+        try:
+            self.close()
+        except:
+            pass
+
+    def setup(self, mode, rate, range):
+        """
+        Prepare device for acquisition
+        :param mode: device mode, one of NR_MODE_ values
+        :param rate: device sampling rate, one of NR_RATE_ values
+        :param range: device dynamic range, one of NR_RATE_ values
+        """
+
+
+        # set amplifier settings
+        self.settings.DataRate = rate
+        self.settings.InputRanges = range
+        # transfer settings to amplifier
+        err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
+
+        if err != NR_ERR_OK:
+            pass
+
+        # set event settings
+        err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
+
+        if err != NR_ERR_OK:
+            pass
+
+        # set amplifier mode
+        self.mode.Mode = mode
+        # transfer mode to amplifier
+        err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
+
+        if err != NR_ERR_OK:
+            pass
 
 # if __name__ == "__main__":
 #     obj = NeoRec()

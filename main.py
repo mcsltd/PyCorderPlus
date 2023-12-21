@@ -41,11 +41,11 @@ def InstantiateModules():
     modules = [
         # AMP_ActiChamp(),
         AMP_NeoRec(),
-        MNT_Recording(),
-        TRG_Eeg(),
-        StorageVision(),
-        FLT_Eeg(),
-        IMP_Display(),
+        # MNT_Recording(),
+        # TRG_Eeg(),
+        # StorageVision(),
+        # FLT_Eeg(),
+        # IMP_Display(),
         DISP_Scope(instance=0),
         # Receiver()
     ]

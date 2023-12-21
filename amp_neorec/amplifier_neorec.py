@@ -3,6 +3,7 @@ from amp_neorec.neorec import *
 from scipy import signal
 
 from res import frmNeoRecOnline
+from res import frmNeoRecConfiguration
 
 from PyQt6.QtWidgets import (QFrame, QApplication)
 from PyQt6.QtCore import pyqtSignal
@@ -74,6 +75,42 @@ class AMP_NeoRec(ModuleBase):
         """ Get the online configuration pane
         """
         return self.online_cfg
+
+    def get_configuration_pane(self):
+        """
+        Get the configuration pane if available.
+        Qt widgets are not reusable, so we have to create it every time
+        """
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        # read amplifier configuration
+        self.amp.readConfiguration(
+            rate=self.sample_rate['base'],
+            range=self.dynamic_range["base"],
+            force=True
+        )
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
+        # create configuration pane
+        config = _DeviceConfigurationPane(self)
+        config.rateChanged.connect(self._samplerate_changed)
+        config.rangeChanged.connect(self._dynamicrange_changed)
+        return config
+
+    def _dynamicrange_changed(self, index):
+        """ SIGNAL from configuration pane if dynamic range has changed
+        """
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.dynamic_range = self.dynamic_ranges[index]
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
+
+    def _samplerate_changed(self, index):
+        """ SIGNAL from configuration pane if sample rate has changed
+        """
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.sample_rate = self.sample_rates[index]
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
 
     def _create_all_channel_selection(self):
         """
@@ -154,6 +191,51 @@ class AMP_NeoRec(ModuleBase):
             self.start()
             QApplication.restoreOverrideCursor()
 
+
+"""
+Amplifier module configuration GUI.
+"""
+
+
+class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
+    rateChanged = pyqtSignal(int)
+    rangeChanged = pyqtSignal(int)
+    def __init__(self, amplifier, *args):
+        super().__init__(*args)
+        self.setupUi(self)
+
+        # reference to our parent module
+        self.amplifier = amplifier
+
+        # Set tab name
+        self.setWindowTitle("Amplifier")
+
+        # actions
+        self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
+        self.comboBoxDynamicRange.currentIndexChanged.connect(self._dynamicrange_changed)
+
+    def _samplerate_changed(self, index):
+        """ SIGNAL sample rate combobox value has changed """
+        print("sample rate changed", index)
+        if index >= 0:
+            # notify parent about changes
+            self.rateChanged.emit(index)
+            self._updateAvailableChannels()
+
+    def _dynamicrange_changed(self, index):
+        """ SIGNAL dynamic range combobox value has changed """
+        print("dynamic range changed", index)
+        if index >= 0:
+            # notify parent about changes
+            self.rangeChanged.emit(index)
+            self._updateAvailableChannels()
+
+    def _updateAvailableChannels(self):
+        eeg = self.amplifier.amp.CountEeg
+        amp = "NeoRec"
+        self.label.setText("Amplifier: %s\n\nAvailable channels: %d EEG" % (amp, eeg))
+
+
 """
 Amplifier NeoRec module online GUI.
 """
@@ -199,6 +281,7 @@ class _OnlineCfgPane(QFrame, frmNeoRecOnline.Ui_frmNeoRecOnline):
             self.pushButtonStartImpedance.setChecked(True)
         else:
             self.pushButtonStop.setChecked(True)
+
 
 if __name__ == "__main__":
     obj = AMP_NeoRec()
