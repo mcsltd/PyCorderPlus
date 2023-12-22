@@ -207,9 +207,9 @@ class NeoRec:
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
 
         if err != NR_ERR_OK:
-            pass
+            return False
 
-        return err
+        return True
 
     def stop(self):
         """
@@ -277,8 +277,8 @@ class NeoRec:
         """
         Update device sampling rate, dymamic range and get new configuration
         @param rate: device base sampling rate
+        :param range: device base dynamic range
         :param force:
-        :param range:
         """
         # not possible if device is already open or not necessary if rate or range has not changed
         if (self.id != 0 or rate == self.settings.DataRate or range == self.settings.InputRange) and not force:
@@ -301,7 +301,6 @@ class NeoRec:
         :param rate: device sampling rate, one of NR_RATE_ values
         :param range: device dynamic range, one of NR_RATE_ values
         """
-
 
         # set amplifier settings
         self.settings.DataRate = rate

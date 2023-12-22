@@ -3,7 +3,7 @@ import threading
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
     QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QScreen
 from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
 
 """
@@ -76,7 +76,6 @@ def InstantiateModules():
     return modules
 
 
-
 class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     """
     Application Main Window Class
@@ -98,9 +97,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
-
-        # actions to find a NeoRec amplifier
-        self.signal_search.connect(self.neorec_search)
 
         # preferences
         self.application_name = "PyCorderPlus"
@@ -124,8 +120,16 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
-            self.signal_search.emit()
 
+            # show a window while searching for an amplifier
+            self.dlgConn = DlgConnectionNeoRec(self)
+            self.dlgConn.signal_hide.connect(self.dlgConn._hide)
+
+            # activate search neorec
+            self.neorec_search()
+
+            # # actions to find a NeoRec amplifier
+            # self.signal_search.connect(self.neorec_search)
 
         # get the bottom module
         self.bottommodule = self.modules[-1]
@@ -171,15 +175,22 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         Launching the NeoRec amplifier search window on the network
         :return:
         """
-        dlg = DlgConnectionNeoRec(self)
-        dlg.show()
+        # show window search amplifier NeoRec
+        self.dlgConn.show()
 
-        # conn = threading.Thread(target=self._search)
-
+        # start searching for an amplifier
+        conn = threading.Thread(target=self._search)
+        conn.start()
         pass
 
     def _search(self):
-        self.topmodule.amp.open()
+        """
+        Activation of the NeoRec amplifier search thread
+        :return:
+        """
+        res = self.topmodule.amp.open()
+        if res:
+            self.dlgConn.signal_hide.emit()
 
     def updateUI(self, isRunning=False):
         """ Update user interface to reflect the recording state
@@ -475,6 +486,8 @@ NeoRec amplifier search window
 
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
+    signal_hide = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
@@ -484,7 +497,16 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
 
         self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
         self.label_2.setFont(QFont("Ms Shell Dlg 2", 8))
-        self.open()
+
+        self.setFixedSize(self.size())
+        # screen_size = QApplication.screen()[1].availableSize()
+        # screen_size = parent.size()
+        # x = (screen_size.width() - parent.width()) // 2
+        # y = (screen_size.height() - parent.height()) // 2
+        # self.move(x, y)
+
+    def _hide(self):
+        self.hide()
 
     def closeEvent(self, event):
         result = QMessageBox.question(self, "Window close confirmation",
