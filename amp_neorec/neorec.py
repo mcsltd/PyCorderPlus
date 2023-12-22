@@ -4,6 +4,7 @@ import _ctypes
 import platform
 import time
 
+
 # NeoRec base sample rate enum
 NR_RATE_125HZ = 0
 NR_RATE_250HZ = 1
@@ -40,6 +41,11 @@ NR_ERR_SUPPORT = -5  # Function is not defined for the connected device
 NR_MODE_DATA = 0
 NR_MODE_IMPEDANCE = 1
 
+# Mode text
+NR_Modes = {
+    NR_MODE_DATA: "acquisition",
+    NR_MODE_IMPEDANCE: "impedance measurement"
+}
 
 class t_nb2Date(ctypes.Structure):
     _pack_ = 1

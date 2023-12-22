@@ -341,6 +341,31 @@ class AMP_NeoRec(ModuleBase):
 
         return eeg
 
+    def process_stop(self):
+        """
+        Stop data acquisition and close hardware object
+        :return:
+        """
+        errors = 999
+        try:
+            errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount # get number of device errors
+        except:
+            pass
+
+        try:
+            self.amp.stop()
+        except:
+            pass
+
+        # send status info
+        # info = "Stop %s" % (NR_Modes[self.recording_mode])
+        # if (errors > 0) and (self.recording_mode != NR_MODE_IMPEDANCE):
+        #     info += " (device errors = %d)" % errors
+
+        # update button state
+        self.online_cfg.updateUI(-1)
+
+
     def process_idle(self):
         """ Check if record time exceeds 200ms over a period of 10 blocks
         and adjust idle time to record time
@@ -361,6 +386,7 @@ class AMP_NeoRec(ModuleBase):
             time.sleep(0.001)
         else:
             time.sleep(idletime)  # suspend the worker thread for 60ms
+
 
 """
 Amplifier module configuration GUI.
