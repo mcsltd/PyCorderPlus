@@ -1,3 +1,5 @@
+import time
+
 from modbase import *
 from amp_neorec.neorec import *
 from scipy import signal
@@ -193,7 +195,6 @@ class AMP_NeoRec(ModuleBase):
         self._set_default_filter()
         self.update_receivers()
 
-
     def _online_mode_changed(self, new_mode):
         """ SIGNAL from online configuration pane if recording mode has changed
         """
@@ -242,6 +243,104 @@ class AMP_NeoRec(ModuleBase):
         self.blocking_counter = 0
         self.initialErrorCount = -1
 
+    def process_output(self):
+        """
+        Get data from amplifier
+        and return the eeg data block
+        """
+        t = time.process_time()
+        self.eeg_data.performance_timer = 0
+        self.eeg_data.performance_timer_max = 0
+        self.recordtime = 0.0
+
+        # check battery voltage every 5s
+
+        if self.recording_mode == NR_MODE_IMPEDANCE:
+            return self.process_impedance()
+
+        if self.amp.BlockingMode:
+            self._thLock.release()
+            try:
+                d, disconnected = self.amp.read(self.channel_indices, len(self.eeg_indices))
+            finally:
+                self._thLock.acquire()
+            self.output_timer = time.process_time()
+        else:
+            d, disconnected = self.amp.read(self.channel_indices, len(self.eeg_indices))
+
+        if d is None:
+            self.acquisitionTimeoutCounter += 1
+
+            # about 5s timeout
+            if self.acquisitionTimeoutCounter > 100:
+                self.acquisitionTimeoutCounter = 0
+                # add search device NeoRec signal
+                raise
+        else:
+            self.acquisitionTimeoutCounter = 0
+
+        # skip the first received data blocks
+        if self.skip_counter > 0:
+            self.skip_counter -= 1
+            return None
+
+        # get the initial error counter
+        if self.initialErrorCount < 0:
+            self.initialErrorCount = self.amp.getDeviceStatus()[1]
+
+        # down sample required?
+        if self.binning > 1:
+            # anti-aliasing filter
+            filtered, self.aliasing_zi = \
+                signal.lfilter(self.aliasing_b, self.aliasing_a, d[0], zi=self.aliasing_zi)
+            # reduce reslution to avoid limit cycle
+            # self.aliasing_zi = np.asfarray(self.aliasing_zi, np.float32)
+
+            self.eeg_data.eeg_channels = filtered[:, self.binningoffset::self.binning]
+            self.eeg_data.trigger_channel = np.bitwise_or.reduce(d[1][:].reshape(-1, self.binning), axis=1).reshape(
+                1, -1)
+            self.eeg_data.sample_channel = d[2][:, self.binningoffset::self.binning] / self.binning
+            self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
+        else:
+            self.eeg_data.eeg_channels = d[0]
+            self.eeg_data.trigger_channel = d[1]
+            self.eeg_data.sample_channel = d[2]
+            self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
+
+        # average, subtract and remove the reference channels
+        if len(self.ref_index):
+            '''
+            # subtract
+            for ref_channel in self.eeg_data.eeg_channels[self.ref_index]:
+                self.eeg_data.eeg_channels[:len(self.eeg_indices)] -= ref_channel
+                # restore reference channel
+                self.eeg_data.eeg_channels[self.ref_index[0]] = ref_channel
+
+            # remove single reference channel if not enabled
+            if not (len(self.eeg_data.channel_properties) > self.ref_index[0] and
+                    self.eeg_data.channel_properties[self.ref_index[0]].isReference ):
+                self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_index, 0)
+            '''
+            # average reference channels
+            reference = np.mean(self.eeg_data.eeg_channels[self.ref_index], 0)
+
+            # subtract reference
+            self.eeg_data.eeg_channels[:len(self.eeg_indices)] -= reference
+
+            # remove all disabled reference channels
+            if len(self.ref_remove_index) > 0:
+                self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
+
+        # calculate date and time for the first sample of this block in s
+        sampletime = self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate
+        self.eeg_data.block_time = self.start_time + datetime.timedelta(seconds=sampletime)
+
+        # put it into the receiver queues
+        eeg = copy.copy(self.eeg_data)
+
+        self.recordtime = time.process_time() - t
+
+        return eeg
 
 """
 Amplifier module configuration GUI.
@@ -251,6 +350,7 @@ Amplifier module configuration GUI.
 class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
     rateChanged = pyqtSignal(int)
     rangeChanged = pyqtSignal(int)
+
     def __init__(self, amplifier, *args):
         super().__init__(*args)
         self.setupUi(self)

@@ -134,6 +134,9 @@ class NeoRec:
         # info has Model, SerialNumber, ProductionDate
         self.info = t_nb2Information()
 
+        self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
+        self.BlockingMode = True  #: read data in blocking mode
+
         # set default properties
         self.settings = t_nb2Settings()
         self.settings.DataRate = NR_RATE_500HZ  #: sampling rate
