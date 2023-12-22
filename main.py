@@ -30,7 +30,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 
-def InstantiateModules():
+def InstantiateModules(name_amp):
     """
     Instantiate and arrange module objects.
     Modules will be connected top -> down, starting with array index 0.
@@ -50,28 +50,28 @@ def InstantiateModules():
         # Receiver()
     ]
 
-    # if name_amp == AMP_ActiChamp.__name__:
-    #     modules = [
-    #         AMP_ActiChamp(),
-    #         MNT_Recording(),
-    #         TRG_Eeg(),
-    #         StorageVision(),
-    #         FLT_Eeg(),
-    #         IMP_Display(),
-    #         DISP_Scope(instance=0),
-    #         # Receiver()
-    #     ]
-    # elif name_amp == AMP_NeoRec.__name__:
-    #     modules = [
-    #         AMP_NeoRec(),
-    #         MNT_Recording(),
-    #         TRG_Eeg(),
-    #         StorageVision(),
-    #         FLT_Eeg(),
-    #         IMP_Display(),
-    #         DISP_Scope(instance=0),
-    #         # Receiver()
-    #     ]
+    if name_amp == AMP_ActiChamp.__name__:
+        modules = [
+            AMP_ActiChamp(),
+            # MNT_Recording(),
+            # TRG_Eeg(),
+            # StorageVision(),
+            # FLT_Eeg(),
+            # IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
+    elif name_amp == AMP_NeoRec.__name__:
+        modules = [
+            AMP_NeoRec(),
+            # MNT_Recording(),
+            # TRG_Eeg(),
+            # StorageVision(),
+            # FLT_Eeg(),
+            # IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
 
     return modules
 
@@ -81,6 +81,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     Application Main Window Class
     includes main menu, status bar and module handling
     """
+    RESTART = 1
 
     def __init__(self):
 
@@ -95,6 +96,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
+        # buttons action to select amplifier type
+        self.actionActiCHamp_Plus.triggered.connect(self._restart)
+        self.actionNeoRec.triggered.connect(self._restart)
 
         # preferences
         self.application_name = "PyCorderPlus"
@@ -118,7 +123,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
-
+            self.actionNeoRec.setDisabled(True)
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
             self.dlgConn.signal_hide.connect(self.dlgConn._hide)
@@ -128,6 +133,8 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
             # # actions to find a NeoRec amplifier
             # self.signal_search.connect(self.neorec_search)
+        elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
+            self.actionActiCHamp_Plus.setDisabled(True)
 
         # get the bottom module
         self.bottommodule = self.modules[-1]
@@ -189,6 +196,18 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         res = self.topmodule.amp.open()
         if res:
             self.dlgConn.signal_hide.emit()
+
+    def _restart(self):
+        """
+        Restart MainWindow for new type amplifier
+        :return:
+        """
+        if self.name_amplifier == AMP_NeoRec.__name__:
+            self.name_amplifier = AMP_ActiChamp.__name__
+        elif self.name_amplifier == AMP_ActiChamp.__name__:
+            self.name_amplifier = AMP_NeoRec.__name__
+        self.close()
+        QApplication.exit(self.RESTART)
 
     def updateUI(self, isRunning=False):
         """ Update user interface to reflect the recording state
@@ -475,7 +494,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         - Modules will be connected top -> down, starting with array index 0
         - Additional modules can be connected left -> right with tuples as list objects
         """
-        self.modules = InstantiateModules()
+        self.modules = InstantiateModules(self.name_amplifier)
 
 
 """
@@ -654,15 +673,17 @@ def main(args):
     # del app
     # name_amplifier = dlg.name_amp
 
-    app = QApplication(sys.argv)
-    win = MainWindow()
-    win.showMaximized()
-    app.exec()
+    res = MainWindow.RESTART
+    while res == MainWindow.RESTART:
 
-    # import pkgutil
-    # search_path = ['.']
-    # all_modules = [x[1] for x in pkgutil.iter_modules(path=search_path)]
-    # print(all_modules)
+        app = QApplication(sys.argv)
+        win = MainWindow()
+        win.showMaximized()
+        res = app.exec()
+
+        del app
+        del win
+
 
 
 if __name__ == "__main__":

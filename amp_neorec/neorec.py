@@ -136,7 +136,7 @@ class NeoRec:
 
         # set default properties
         self.settings = t_nb2Settings()
-        self.settings.DataRate = NR_RATE_125HZ  #: sampling rate
+        self.settings.DataRate = NR_RATE_500HZ  #: sampling rate
         self.settings.InputRange = NR_RANGE_mV150  #: input range
         self.settings.EnabledChannels = 0x001FFFFF  #: enabled channels
 
@@ -210,6 +210,27 @@ class NeoRec:
             return False
 
         return True
+
+    def start(self):
+        """
+        Start data acquisition
+        :return:
+        """
+        if self.running:
+            return
+        if self.id == 0:
+            raise
+
+        # start amplifier
+        err = self.lib.nb2Start(self.id)
+        if err != NR_ERR_OK:
+            raise
+
+        self.running = True
+        self.readError = False
+        self.sampleCounterAdjust = 0
+        self.BlockTimer = time.process_time()
+        pass
 
     def stop(self):
         """

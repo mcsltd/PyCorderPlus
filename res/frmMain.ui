@@ -167,7 +167,7 @@
      <property name="title">
       <string>Select Amplifier</string>
      </property>
-     <addaction name="actionNeoRec_NeoRec_cap_NeoRec_21"/>
+     <addaction name="actionNeoRec"/>
      <addaction name="actionActiCHamp_Plus"/>
     </widget>
     <addaction name="menuSelect_Amplifier"/>
@@ -201,7 +201,7 @@
     <string>Reset Configuration</string>
    </property>
   </action>
-  <action name="actionNeoRec_NeoRec_cap_NeoRec_21">
+  <action name="actionNeoRec">
    <property name="text">
     <string>NeoRec (NeoRec cap, NeoRec 21)</string>
    </property>

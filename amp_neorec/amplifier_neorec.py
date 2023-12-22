@@ -177,6 +177,23 @@ class AMP_NeoRec(ModuleBase):
             channel.lowpass = 0.0  # low pass off
             channel.notchfilter = False  # notch filter off
 
+    def setDefault(self):
+        """
+        Set all module parameters to default values
+        """
+        self.sample_rate = self.sample_rates[7]  # 500Hz sample rate
+        for channel in self.channel_config:
+            channel.isReference = False
+            if channel.group == ChannelGroup.EEG:
+                channel.enable = True  # enable all EEG channels
+                if channel.input == 1:
+                    channel.isReference = True  # use first channel as reference
+            else:
+                channel.enable = False  # disable all AUX channels
+        self._set_default_filter()
+        self.update_receivers()
+
+
     def _online_mode_changed(self, new_mode):
         """ SIGNAL from online configuration pane if recording mode has changed
         """
@@ -190,6 +207,40 @@ class AMP_NeoRec(ModuleBase):
             self.recording_mode = new_mode
             self.start()
             QApplication.restoreOverrideCursor()
+
+    def process_start(self):
+        """
+        Open amplifier hardware and start data acquisition
+        """
+
+        # reset variables
+        self.eeg_data.sample_counter = 0
+        self.acquisitionTimeoutCounter = 0
+        self.battery_timer = 0
+        self.test_counter = 0
+
+        # setup hardware
+        self.amp.setup(mode=self.recording_mode, rate=self.sample_rate["base"], range=self.dynamic_range["base"])
+        self.update_receivers()
+
+        if len(self.channel_indices) == 0:
+            raise
+
+        # check battery
+
+        # start hardware
+        self.amp.start()
+
+        # set start time on first call
+        self.start_time = datetime.datetime.now()
+
+        # update button state
+        self.online_cfg.updateUI(self.recording_mode)
+
+        # skip the first received data blocks
+        self.skip_counter = 5
+        self.blocking_counter = 0
+        self.initialErrorCount = -1
 
 
 """
