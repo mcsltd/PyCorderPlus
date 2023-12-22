@@ -82,8 +82,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     includes main menu, status bar and module handling
     """
 
-    signal_search = pyqtSignal()
-
     def __init__(self):
 
         super().__init__()
@@ -447,7 +445,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if not self.topmodule.query("Stop"):
             event.ignore()
         else:
-            self.topmodule.stop(force=True)
+            self.topmodule.stop()
             self.savePreferences()
             # clean up modules
             for module in flatten(self.modules):
