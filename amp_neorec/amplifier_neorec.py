@@ -337,10 +337,30 @@ class AMP_NeoRec(ModuleBase):
 
         # put it into the receiver queues
         eeg = copy.copy(self.eeg_data)
-
         self.recordtime = time.process_time() - t
 
         return eeg
+
+    def process_idle(self):
+        """ Check if record time exceeds 200ms over a period of 10 blocks
+        and adjust idle time to record time
+        """
+        if self.recordtime > 0.2:
+            self.blocking_counter += 1
+            # drop blocks if exceeded
+            if self.blocking_counter > 10:
+                self.skip_counter = 10
+                self.blocking_counter = 0
+        else:
+            self.blocking_counter = 0
+
+        # adjust idle time to record time
+        idletime = max(0.06 - self.recordtime, 0.02)
+
+        if self.amp.BlockingMode:
+            time.sleep(0.001)
+        else:
+            time.sleep(idletime)  # suspend the worker thread for 60ms
 
 """
 Amplifier module configuration GUI.
