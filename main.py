@@ -38,17 +38,18 @@ def InstantiateModules(name_amp):
     @return: list with instantiated module objects
     """
     # test modules for control amplifier
-    modules = [
-        # AMP_ActiChamp(),
-        AMP_NeoRec(),
-        # MNT_Recording(),
-        # TRG_Eeg(),
-        # StorageVision(),
-        # FLT_Eeg(),
-        # IMP_Display(),
-        DISP_Scope(instance=0),
-        # Receiver()
-    ]
+    # modules = [
+    #     # AMP_ActiChamp(),
+    #     AMP_NeoRec(),
+    #     # MNT_Recording(),
+    #     # TRG_Eeg(),
+    #     # StorageVision(),
+    #     # FLT_Eeg(),
+    #     # IMP_Display(),
+    #     DISP_Scope(instance=0),
+    #     # Receiver()
+    # ]
+    modules = []
 
     if name_amp == AMP_ActiChamp.__name__:
         modules = [

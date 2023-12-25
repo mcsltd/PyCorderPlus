@@ -216,7 +216,28 @@ class AMP_NeoRec(ModuleBase):
         :param event:
         :return:
         """
+        if event.type == EventType.COMMAND:
+
+            # check for stop command
+            if event.info == "Stop":
+                if event.cmd_value == "force":
+                    self.stop(force=True)
+                else:
+                    self.stop()
         pass
+
+    def stop(self, force=False):
+        """ Stop data acquisition
+        @param force: force stop without query
+        @return: True, if stop was accepted by attached modules
+        """
+        # ask attached modules for acceptance
+        if not force:
+            if not self.query("Stop"):
+                return False
+        # stop it
+        ModuleBase.stop(self)
+        return True
 
     def process_update(self, params):
         """
