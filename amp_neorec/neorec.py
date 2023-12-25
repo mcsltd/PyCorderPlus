@@ -3,6 +3,7 @@ import ctypes.wintypes
 import _ctypes
 import platform
 import time
+import numpy as np
 
 
 # NeoRec base sample rate enum
@@ -131,17 +132,26 @@ class NeoRec:
         # get OS architecture (64-bit)
         self.x64 = ("64" in platform.architecture()[0])
 
+        # set default values
         self.id = 0  # Device id
-
-        self.open_ble = False  # BLE device connected
+        self.connected = False  # Connected to amplifier
         self.running = False  # Data acquisition running
         self.model = None
+        self.readError = False  # an error occurred during data acquisition
+        self.buffer = ctypes.create_string_buffer(10000 * 1024)  #: raw data transfer buffer
+        self.properties = t_nb2Property()  # NeoRec property structure
+        self.impbuffer = ctypes.create_string_buffer(1000)  #: impedance raw data transfer buffer
 
         # info has Model, SerialNumber, ProductionDate
         self.info = t_nb2Information()
 
         self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
         self.BlockingMode = True  #: read data in blocking mode
+
+        # binning buffer for max. 100 samples with 21 channels with a datasize of int32 (4 bytes)
+        self.binning_buffer = ctypes.create_string_buffer(100 * 21 * 4)  #: binning buffer
+        self.binning = 1  #: binning size for buffer alignment
+        self.binning_offset = 0  #: raw data buffer offset in bytes for binning
 
         # set default properties
         self.settings = t_nb2Settings()
@@ -201,7 +211,7 @@ class NeoRec:
             # raise AmpError("library nb2mcs.dll not available")
             return
 
-        while not self.open_ble:
+        while not self.connected:
             # get the number of devices on the network
             c = self.lib.nb2GetCount()
             if c > 0:
@@ -210,11 +220,15 @@ class NeoRec:
                 # open this device
                 err = self.lib.nb2Open(self.id)
                 if err != NR_ERR_OK:
-                    self.open_ble = True
+                    self.connected = True
 
         # get information about open device
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
+        if err != NR_ERR_OK:
+            return False
 
+        # get device properies
+        err = self.lib.nb2GetProperty(self.id, self.properties)
         if err != NR_ERR_OK:
             return False
 
@@ -354,6 +368,101 @@ class NeoRec:
 
         if err != NR_ERR_OK:
             pass
+
+    def read(self, indices, eegcount):
+        """
+        Read data from device
+        :param indices: to select the requested channels from raw data stream
+        :param eegcount: number of requested EEG channels
+        :return:
+        """
+        if not self.running or (self.id == 0) or self.readError:
+            return None, None
+
+        # calculate data amount for an interval of
+        interval = 0.05  # interval in [s]
+        bytes_per_sample = (self.CountEeg + self.CountAux + 1 + 1) * np.dtype(np.int32).itemsize
+        requestedbytes = int(bytes_per_sample * sample_rate[self.settings.Rate] * interval)
+
+        t = time.process_time()
+
+        # read data from device
+        bytesread = self.lib.nb2GetData(self.id, ctypes.byref(self.buffer, self.binning_offset), len(self.buffer))
+
+        blocktime = (time.process_time() - self.BlockTimer)
+        self.BlockTimer = time.process_time()
+        # print str(blocktime) + " : " + str(bytesread)
+
+        # print str(t-self.lastt) + " : " + str(bytesread)
+        # self.lastt = t
+
+        # check for device error
+        if self.binning > 1:
+            # align buffer to requested binning size
+            total_bytes = bytesread + self.binning_offset
+            # copy remainder from last read back to sample buffer
+            ctypes.memmove(self.buffer, self.binning_buffer, self.binning_offset)
+            # new remainder size
+            remainder = ((total_bytes / bytes_per_sample) % self.binning) * bytes_per_sample
+            # number of binning aligned samples
+            binning_samples = total_bytes / bytes_per_sample / self.binning * self.binning
+            src_offset = binning_samples * bytes_per_sample
+            # copy new remainder to binning buffer
+            ctypes.memmove(self.binning_buffer, ctypes.byref(self.buffer, src_offset), remainder)
+            self.binning_offset = remainder
+
+            # there must be at least one binning sample
+            if binning_samples == 0:
+                return None, None
+            items = binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize
+        else:
+            items = bytesread / np.dtype(np.int32).itemsize
+
+        # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
+        x = np.fromstring(self.buffer, np.int32, items)
+        # shape and transpose to 1st axis is channel and 2nd axis is sample
+        samplesize = self.CountEeg + 1 + 1
+        x.shape = (-1, samplesize)
+        y = x.transpose()
+
+        # extract the different channel types
+        index = 0
+        eeg = np.array(y[indices], np.float)
+
+        # get indices of disconnected electrodes (all values == ADC_MAX)
+        # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
+        disconnected = None  # not possible yet
+
+        # extract and scale the different channel types
+        eegscale = self.properties.ResolutionEeg * 1e6  # convert to µV
+        eeg[index:eegcount] = eeg[index:eegcount] * eegscale
+        index += eegcount
+
+        # extract sample counter channel
+        index += 1
+        sctTemp = np.array(y[index:index + 1], np.uint32)
+
+        # search for sample counter wrap around and adjust counter
+        sct = np.array(sctTemp, np.uint64) + self.sampleCounterAdjust
+        wrap = np.nonzero(sctTemp == 0)
+        if (wrap[1].size > 0) and sct[0][0]:
+            wrapIndex = wrap[1][0]
+            adjust = np.iinfo(np.uint32).max + 1
+            self.sampleCounterAdjust += adjust
+            sct[:, wrapIndex:] += adjust
+
+        d = []
+        d.append(eeg)
+        d.append(sct)
+        return d, disconnected
+
+    def getDeviceStatus(self):
+        """
+        Read status values from device
+        @return: total samples, total errors, data rate and data speed as tuple
+        """
+        # there are no functions from the dll library to implement this function
+        pass
 
 # if __name__ == "__main__":
 #     obj = NeoRec()

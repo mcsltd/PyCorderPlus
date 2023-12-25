@@ -209,6 +209,34 @@ class AMP_NeoRec(ModuleBase):
             self.start()
             QApplication.restoreOverrideCursor()
 
+    def process_event(self, event):
+        """
+        Handle events from attached receivers
+        :param event:
+        :return:
+        """
+        pass
+
+    def process_update(self, params):
+        """
+        Prepare channel properties and propagate update to all connected receivers
+        :param params:
+        :return:
+        """
+        # update device sampling rate and get new configuration
+        try:
+            self.amp.readConfiguration(
+                rate=self.sample_rate["base"],
+                range=self.dynamic_range["base"],
+            )
+        except Exception as err:
+            pass
+
+        # create channel selection maps
+        self._create_all_channel_selection()
+
+        return copy.copy(self.eeg_data)
+
     def process_start(self):
         """
         Open amplifier hardware and start data acquisition
@@ -286,7 +314,8 @@ class AMP_NeoRec(ModuleBase):
 
         # get the initial error counter
         if self.initialErrorCount < 0:
-            self.initialErrorCount = self.amp.getDeviceStatus()[1]
+            # self.initialErrorCount = self.amp.getDeviceStatus()[1]
+            pass
 
         # down sample required?
         if self.binning > 1:
@@ -347,10 +376,10 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         errors = 999
-        try:
-            errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount # get number of device errors
-        except:
-            pass
+        # try:
+        #     # errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount  # get number of device errors
+        # except:
+        #     pass
 
         try:
             self.amp.stop()
@@ -364,7 +393,6 @@ class AMP_NeoRec(ModuleBase):
 
         # update button state
         self.online_cfg.updateUI(-1)
-
 
     def process_idle(self):
         """ Check if record time exceeds 200ms over a period of 10 blocks
