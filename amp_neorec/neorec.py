@@ -417,6 +417,10 @@ class NeoRec:
                 requestedbytes
             )
 
+        # data available?
+        if bytesread == 0:
+            return None, None
+
         blocktime = (time.process_time() - self.BlockTimer)
         self.BlockTimer = time.process_time()
         # print str(blocktime) + " : " + str(bytesread)

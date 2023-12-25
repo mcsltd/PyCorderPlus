@@ -16,6 +16,8 @@ class AMP_NeoRec(ModuleBase):
     NeoRec devices module
     """
 
+    disconnect_signal = pyqtSignal()
+
     def __init__(self, *args, **kwargs):
         super().__init__(name="Amplifier", **kwargs)
 
@@ -193,7 +195,7 @@ class AMP_NeoRec(ModuleBase):
         Set all module parameters to default values
         """
         self.sample_rate = self.sample_rates[0]  # 125Hz sample rate
-        self.dynamic_range = self.dynamic_ranges[0]     # 150 mV dynamic range
+        self.dynamic_range = self.dynamic_ranges[0]  # 150 mV dynamic range
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
@@ -284,7 +286,15 @@ class AMP_NeoRec(ModuleBase):
         self.test_counter = 0
 
         # setup hardware
-        self.amp.setup(mode=self.recording_mode, rate=self.sample_rate["base"], range=self.dynamic_range["base"])
+        err = self.amp.setup(
+            mode=self.recording_mode,
+            rate=self.sample_rate["base"],
+            range=self.dynamic_range["base"]
+        )
+
+        # if err != NR_ERR_OK:
+        #     self.disconnect_signal.emit()
+
         self.update_receivers()
 
         if len(self.channel_indices) == 0:
@@ -337,6 +347,7 @@ class AMP_NeoRec(ModuleBase):
             # about 5s timeout
             if self.acquisitionTimeoutCounter > 100:
                 self.acquisitionTimeoutCounter = 0
+                print("Connection is broken. Stop...")
                 # add search device NeoRec signal
                 raise
         else:
@@ -532,6 +543,7 @@ Amplifier module configuration GUI.
 class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
     rateChanged = pyqtSignal(int)
     rangeChanged = pyqtSignal(int)
+
     # dataChanged = pyqtSignal()
     def __init__(self, amplifier, *args):
         super().__init__(*args)
@@ -547,6 +559,8 @@ class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig
         self.comboBoxSampleRate.setCurrentIndex(self.amplifier.sample_rate["base"])
         # set current index in combobox Dynamic Range
         self.comboBoxDynamicRange.setCurrentIndex(self.amplifier.dynamic_range["base"])
+
+        self._updateAvailableChannels()
 
         # actions
         self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
@@ -568,7 +582,11 @@ class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig
 
     def _updateAvailableChannels(self):
         eeg = self.amplifier.amp.CountEeg
-        amp = "NeoRec"
+        amp = "NeoRec not connected"
+        if self.amplifier.amp.connected:
+            if self.amplifier.model in NR_Models:
+                amp = NR_Models[self.amplifier.model]
+
         self.label.setText("Amplifier: %s\n\nAvailable channels: %d EEG" % (amp, eeg))
 
 

@@ -126,6 +126,8 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.actionNeoRec.setDisabled(True)
 
+            # self.topmodule.disconnect_signal.connect(self.neorec_search)
+
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
             self.dlgConn.signal_hide.connect(self.dlgConn._hide)
