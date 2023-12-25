@@ -126,6 +126,18 @@ NR_NAME_CHANNEL_EEG21S = ["C4", "A2", "F8", "T6", "F4", "P4", "Fp2",
                           "O2", "Cz", "Pz", "Fz", "O1", "Fp1", "P3",
                           "F3", "T5", "F7", "A1", "C3", "T3", "T4"]
 
+# NeoRec amplifier models
+NR_21 = 1902
+NR_MINI = 1904
+NR_CAP_1 = 1900
+NR_CAP_2 = 1900
+NR_Models = {
+    NR_CAP_1: "NeoRec cap",
+    NR_CAP_2: "NeoRec cap",
+    NR_21: "NeoRec 21",
+    NR_MINI: "NeoRec mini",
+}
+
 
 class NeoRec:
     def __init__(self):
@@ -136,7 +148,6 @@ class NeoRec:
         self.id = 0  # Device id
         self.connected = False  # Connected to amplifier
         self.running = False  # Data acquisition running
-        self.model = None
         self.readError = False  # an error occurred during data acquisition
         self.buffer = ctypes.create_string_buffer(10000 * 1024)  #: raw data transfer buffer
 
@@ -227,8 +238,12 @@ class NeoRec:
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
         if err != NR_ERR_OK:
             return False
+        else:
+            # get the NeoRec amp model and serial number
+            self.model = self.info.Model
+            self.sn = self.info.SerialNumber
 
-        # get device properies
+        # get device properties
         err = self.lib.nb2GetProperty(self.id, ctypes.byref(self.properties))
         if err != NR_ERR_OK:
             return False

@@ -316,15 +316,20 @@ class EEG_DataBlock:
         return 0
 
     @classmethod
-    def get_default_properties(cls, eeg, aux):
+    def get_default_properties(cls, eeg, aux, eeg_ch_names=None):
         ''' Get an property array with default settings
         @param eeg: number of EEG channels
         @param aux: number of AUX channels
         '''
         channel_properties = []
         for c in range(0, eeg):
+
             # EEG channels
-            ch = EEG_ChannelProperties("Ch%d" % (c + 1))
+            if eeg_ch_names is not None and len(eeg_ch_names) == eeg:
+                ch = EEG_ChannelProperties(eeg_ch_names[c])
+            else:
+                ch = EEG_ChannelProperties("Ch%d" % (c + 1))
+
             ch.inputgroup = ChannelGroup.EEG
             ch.group = ChannelGroup.EEG
             ch.input = c + 1

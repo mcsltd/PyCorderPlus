@@ -22,6 +22,9 @@ class AMP_NeoRec(ModuleBase):
         # create hardware object
         self.amp = NeoRec()
 
+        self.model = None  # Device model
+        self.sn = None  # Serial Number
+
         # set default channel configuration
         self.max_eeg_channels = 21  #: number of EEG channels for max. HW configuration
         self.max_aux_channels = 0  #: number of AUX channels for max. HW configuration
@@ -194,6 +197,11 @@ class AMP_NeoRec(ModuleBase):
             else:
                 channel.enable = False  # disable all AUX channels
         self._set_default_filter()
+
+        # if NeoRec is connected, set the appropriate channel names
+        if self.model is not None:
+            self._set_eeg_channel_names()
+
         self.update_receivers()
 
     def _online_mode_changed(self, new_mode):
@@ -474,6 +482,42 @@ class AMP_NeoRec(ModuleBase):
         eeg = copy.copy(self.eeg_data)
         return eeg
 
+    def set_info(self):
+        """
+        Receive and save information about the type of amplifier connected.
+        :return:
+        """
+        # save amplifier model and serial number
+        self.model = self.amp.info.Model
+        self.sn = self.amp.info.SerialNumber
+
+        self._set_eeg_channel_names()
+        # self._create_all_channel_selection()
+        self.update_receivers()
+
+    def _set_eeg_channel_names(self):
+        """
+        Set channel names depending on NeoRec model.
+        :return:
+        """
+        # set amplifier channel names
+        if self.model in NR_Models:
+
+            if NR_Models[self.model] == "NeoRec 21":
+                # set channel names for NeoRec 21
+                self.channel_config = EEG_DataBlock.get_default_properties(
+                    self.max_eeg_channels,
+                    self.max_aux_channels,
+                    eeg_ch_names=NR_NAME_CHANNEL_EEG21
+                )
+
+            if NR_Models[self.model] == "NeoRec mini":
+                # set channel names for NeoRec mini
+                self.channel_config = EEG_DataBlock.get_default_properties(
+                    self.max_eeg_channels,
+                    self.max_aux_channels,
+                    eeg_ch_names=NR_NAME_CHANNEL_EEG21S
+                )
 
 
 """
