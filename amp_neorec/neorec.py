@@ -341,18 +341,18 @@ class NeoRec:
         :param force:
         """
         # not possible if device is already open or not necessary if rate or range has not changed
-        if (self.id != 0 or rate == self.settings.DataRate or range == self.settings.InputRange) and not force:
+        if (self.id != 0 and rate == self.settings.DataRate and range == self.settings.InputRange) and not force:
             return
         # update sampling rate and get new configuration
         try:
-            self.setup(self.mode.Mode, rate, range)
+            self.setup(
+                mode=self.mode.Mode,
+                rate=rate,
+                range=range
+            )
         except:
             pass
 
-        try:
-            self.close()
-        except:
-            pass
 
     def setup(self, mode, rate, range):
         """

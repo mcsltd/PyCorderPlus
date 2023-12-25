@@ -117,6 +117,12 @@ class AMP_NeoRec(ModuleBase):
         self.update_receivers()
         QApplication.restoreOverrideCursor()
 
+    def _configuration_changed(self):
+        """
+        SIGNAL from configuration pane if values has changed
+        """
+        self.update_receivers()
+
     def _create_all_channel_selection(self):
         """
         Create index arrays of all available channels and prepare EEG_DataBlock
@@ -271,7 +277,6 @@ class AMP_NeoRec(ModuleBase):
         """
         Open amplifier hardware and start data acquisition
         """
-
         # reset variables
         self.eeg_data.sample_counter = 0
         self.acquisitionTimeoutCounter = 0
@@ -492,7 +497,6 @@ class AMP_NeoRec(ModuleBase):
         self.sn = self.amp.info.SerialNumber
 
         self._set_eeg_channel_names()
-        # self._create_all_channel_selection()
         self.update_receivers()
 
     def _set_eeg_channel_names(self):
@@ -528,7 +532,7 @@ Amplifier module configuration GUI.
 class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
     rateChanged = pyqtSignal(int)
     rangeChanged = pyqtSignal(int)
-
+    # dataChanged = pyqtSignal()
     def __init__(self, amplifier, *args):
         super().__init__(*args)
         self.setupUi(self)
@@ -539,13 +543,17 @@ class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig
         # Set tab name
         self.setWindowTitle("Amplifier")
 
+        # set current index in combobox Sample Rate
+        self.comboBoxSampleRate.setCurrentIndex(self.amplifier.sample_rate["base"])
+        # set current index in combobox Dynamic Range
+        self.comboBoxDynamicRange.setCurrentIndex(self.amplifier.dynamic_range["base"])
+
         # actions
         self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
         self.comboBoxDynamicRange.currentIndexChanged.connect(self._dynamicrange_changed)
 
     def _samplerate_changed(self, index):
         """ SIGNAL sample rate combobox value has changed """
-        print("sample rate changed", index)
         if index >= 0:
             # notify parent about changes
             self.rateChanged.emit(index)
@@ -553,7 +561,6 @@ class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig
 
     def _dynamicrange_changed(self, index):
         """ SIGNAL dynamic range combobox value has changed """
-        print("dynamic range changed", index)
         if index >= 0:
             # notify parent about changes
             self.rangeChanged.emit(index)
