@@ -68,7 +68,7 @@ def InstantiateModules(name_amp):
             # TRG_Eeg(),
             # StorageVision(),
             # FLT_Eeg(),
-            # IMP_Display(),
+            IMP_Display(),
             DISP_Scope(instance=0),
             # Receiver()
         ]

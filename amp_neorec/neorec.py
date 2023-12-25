@@ -5,7 +5,6 @@ import platform
 import time
 import numpy as np
 
-
 # NeoRec base sample rate enum
 NR_RATE_125HZ = 0
 NR_RATE_250HZ = 1
@@ -47,6 +46,7 @@ NR_Modes = {
     NR_MODE_DATA: "acquisition",
     NR_MODE_IMPEDANCE: "impedance measurement"
 }
+
 
 class t_nb2Date(ctypes.Structure):
     _pack_ = 1
@@ -139,6 +139,7 @@ class NeoRec:
         self.model = None
         self.readError = False  # an error occurred during data acquisition
         self.buffer = ctypes.create_string_buffer(10000 * 1024)  #: raw data transfer buffer
+
         self.properties = t_nb2Property()  # NeoRec property structure
         self.impbuffer = ctypes.create_string_buffer(1000)  #: impedance raw data transfer buffer
 
@@ -228,7 +229,7 @@ class NeoRec:
             return False
 
         # get device properies
-        err = self.lib.nb2GetProperty(self.id, self.properties)
+        err = self.lib.nb2GetProperty(self.id, ctypes.byref(self.properties))
         if err != NR_ERR_OK:
             return False
 
@@ -349,6 +350,7 @@ class NeoRec:
         # set amplifier settings
         self.settings.DataRate = rate
         self.settings.InputRanges = range
+
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
 
@@ -381,13 +383,24 @@ class NeoRec:
 
         # calculate data amount for an interval of
         interval = 0.05  # interval in [s]
-        bytes_per_sample = (self.CountEeg + self.CountAux + 1 + 1) * np.dtype(np.int32).itemsize
-        requestedbytes = int(bytes_per_sample * sample_rate[self.settings.Rate] * interval)
+        bytes_per_sample = (self.CountEeg + 1 + 1) * np.dtype(np.int32).itemsize
+        requestedbytes = int(bytes_per_sample * sample_rate[self.settings.DataRate] * interval)
 
         t = time.process_time()
 
         # read data from device
-        bytesread = self.lib.nb2GetData(self.id, ctypes.byref(self.buffer, self.binning_offset), len(self.buffer))
+        if not self.BlockingMode:
+            bytesread = self.lib.nb2GetData(
+                self.id,
+                ctypes.byref(self.buffer, self.binning_offset),
+                len(self.buffer) - self.binning_offset
+            )
+        else:
+            bytesread = self.lib.nb2GetData(
+                self.id,
+                ctypes.byref(self.buffer, self.binning_offset),
+                requestedbytes
+            )
 
         blocktime = (time.process_time() - self.BlockTimer)
         self.BlockTimer = time.process_time()
@@ -403,10 +416,10 @@ class NeoRec:
             # copy remainder from last read back to sample buffer
             ctypes.memmove(self.buffer, self.binning_buffer, self.binning_offset)
             # new remainder size
-            remainder = ((total_bytes / bytes_per_sample) % self.binning) * bytes_per_sample
+            remainder = int(((total_bytes / bytes_per_sample) % self.binning) * bytes_per_sample)
             # number of binning aligned samples
-            binning_samples = total_bytes / bytes_per_sample / self.binning * self.binning
-            src_offset = binning_samples * bytes_per_sample
+            binning_samples = int(total_bytes / bytes_per_sample / self.binning * self.binning)
+            src_offset = int(binning_samples * bytes_per_sample)
             # copy new remainder to binning buffer
             ctypes.memmove(self.binning_buffer, ctypes.byref(self.buffer, src_offset), remainder)
             self.binning_offset = remainder
@@ -414,9 +427,9 @@ class NeoRec:
             # there must be at least one binning sample
             if binning_samples == 0:
                 return None, None
-            items = binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize
+            items = int(binning_samples * bytes_per_sample / np.dtype(np.int32).itemsize)
         else:
-            items = bytesread / np.dtype(np.int32).itemsize
+            items = int(bytesread / np.dtype(np.int32).itemsize)
 
         # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
         x = np.fromstring(self.buffer, np.int32, items)
@@ -427,14 +440,14 @@ class NeoRec:
 
         # extract the different channel types
         index = 0
-        eeg = np.array(y[indices], np.float)
+        eeg = np.array(y[indices], np.float64)
 
         # get indices of disconnected electrodes (all values == ADC_MAX)
         # disconnected = np.nonzero(np.all(eeg == ADC_MAX, axis=1))
         disconnected = None  # not possible yet
 
         # extract and scale the different channel types
-        eegscale = self.properties.ResolutionEeg * 1e6  # convert to µV
+        eegscale = self.properties.Resolution * 1e6  # convert to µV
         eeg[index:eegcount] = eeg[index:eegcount] * eegscale
         index += eegcount
 
@@ -463,6 +476,36 @@ class NeoRec:
         """
         # there are no functions from the dll library to implement this function
         pass
+
+    def readImpedances(self):
+        """
+        Get the electrode impedance values
+        @return: list of impedance values for all EEG channels plus ground electrode in Ohm.
+        """
+        if not self.running or (self.id == 0):
+            return None, None
+
+        disconnected = None
+        # read impedance data from device
+        err = self.lib.nb2GetImpedance(
+            self.id,
+            ctypes.byref(self.impbuffer),
+            len(self.impbuffer)
+        )
+
+        if err != NR_ERR_OK:
+            # raise AmpError("failed to read impedance values", err)
+            raise
+
+        # if err2 == CHAMP_ERR_MONITORING:
+        #     disconnected = CHAMP_ERR_MONITORING
+        # if err == NR_ERR_FAIL:
+        #     return None, None
+
+        # channel order in buffer is CH1,CH2..CHn, GND
+        items = self.CountEeg + 1
+        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+
 
 # if __name__ == "__main__":
 #     obj = NeoRec()

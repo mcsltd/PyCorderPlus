@@ -42,7 +42,7 @@ class AMP_NeoRec(ModuleBase):
             base = self.amp.getDynamicRangeBase(range)
             self.dynamic_ranges.append({"range": str(range), "base": base})
 
-        self.sample_rate = self.sample_rates[1]
+        self.sample_rate = self.sample_rates[0]
         self.dynamic_range = self.dynamic_ranges[0]
         self.binning = self.sample_rate['div']
         self.binningoffset = 0
@@ -86,7 +86,7 @@ class AMP_NeoRec(ModuleBase):
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         # read amplifier configuration
         self.amp.readConfiguration(
-            rate=self.sample_rate['base'],
+            rate=self.sample_rate["base"],
             range=self.dynamic_range["base"],
             force=True
         )
@@ -183,7 +183,8 @@ class AMP_NeoRec(ModuleBase):
         """
         Set all module parameters to default values
         """
-        self.sample_rate = self.sample_rates[7]  # 500Hz sample rate
+        self.sample_rate = self.sample_rates[0]  # 125Hz sample rate
+        self.dynamic_range = self.dynamic_ranges[0]     # 150 mV dynamic range
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
@@ -326,14 +327,11 @@ class AMP_NeoRec(ModuleBase):
             # self.aliasing_zi = np.asfarray(self.aliasing_zi, np.float32)
 
             self.eeg_data.eeg_channels = filtered[:, self.binningoffset::self.binning]
-            self.eeg_data.trigger_channel = np.bitwise_or.reduce(d[1][:].reshape(-1, self.binning), axis=1).reshape(
-                1, -1)
-            self.eeg_data.sample_channel = d[2][:, self.binningoffset::self.binning] / self.binning
+            self.eeg_data.sample_channel = int(d[1][:, self.binningoffset::self.binning] / self.binning)
             self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
         else:
             self.eeg_data.eeg_channels = d[0]
-            self.eeg_data.trigger_channel = d[1]
-            self.eeg_data.sample_channel = d[2]
+            self.eeg_data.sample_channel = d[1]
             self.eeg_data.sample_counter += self.eeg_data.sample_channel.shape[1]
 
         # average, subtract and remove the reference channels
@@ -359,9 +357,8 @@ class AMP_NeoRec(ModuleBase):
             # remove all disabled reference channels
             if len(self.ref_remove_index) > 0:
                 self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
-
         # calculate date and time for the first sample of this block in s
-        sampletime = self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate
+        sampletime = int(self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate)
         self.eeg_data.block_time = self.start_time + datetime.timedelta(seconds=sampletime)
 
         # put it into the receiver queues
@@ -414,6 +411,48 @@ class AMP_NeoRec(ModuleBase):
             time.sleep(0.001)
         else:
             time.sleep(idletime)  # suspend the worker thread for 60ms
+
+    def process_impedance(self):
+        """
+        Get the impedance values from amplifier
+        and return the eeg data block
+        """
+        # send values only once per second
+        t = time.process_time()
+        if (t - self.impedance_timer) < 1.0:
+            return None
+        self.impedance_timer = t
+
+        # get impedance values from device
+        imp, disconnected = self.amp.readImpedances()
+
+        if imp is None:
+            return None
+
+        eeg_imp = imp[self.eeg_indices]
+        gnd_imp = imp[-1]
+        self.eeg_data.impedances = eeg_imp.tolist()
+        self.eeg_data.impedances.append(gnd_imp)
+
+        # invalidate the old impedance data list
+        self.eeg_data.impedances = []
+
+        # copy impedance values to data array
+        self.eeg_data.eeg_channels = np.zeros((len(self.channel_indices), 10), 'd')
+        self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.DATA] = eeg_imp
+        self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.GND] = gnd_imp
+
+        # dummy values for trigger and sample counter
+        self.eeg_data.trigger_channel = np.zeros((1, 10), np.uint32)
+        self.eeg_data.sample_channel = np.zeros((1, 10), np.uint32)
+
+        # set recording time
+        self.eeg_data.block_time = datetime.datetime.now()
+
+        # put it into the receiver queues
+        eeg = copy.copy(self.eeg_data)
+        return eeg
+
 
 
 """
