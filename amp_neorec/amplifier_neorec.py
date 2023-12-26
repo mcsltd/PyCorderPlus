@@ -347,11 +347,13 @@ class AMP_NeoRec(ModuleBase):
             self.acquisitionTimeoutCounter += 1
 
             # about 5s timeout
-            if self.acquisitionTimeoutCounter > 100:
+            if self.acquisitionTimeoutCounter > 1000:
                 self.acquisitionTimeoutCounter = 0
                 print("Connection is broken. Stop...")
                 # add search device NeoRec signal
                 raise
+
+            return None
         else:
             self.acquisitionTimeoutCounter = 0
 

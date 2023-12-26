@@ -132,7 +132,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.actionNeoRec.setDisabled(True)
 
-            # self.topmodule.disconnect_signal.connect(self.neorec_search)
+            self.topmodule.disconnect_signal.connect(self._reconnect)
 
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
@@ -184,6 +184,19 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     def neorec_search(self):
         """
         Launching the NeoRec amplifier search window on the network
+        :return:
+        """
+        # show window search amplifier NeoRec
+        self.dlgConn.show()
+
+        # start searching for an amplifier
+        conn = threading.Thread(target=self._search)
+        conn.start()
+        pass
+
+    def _reconnect(self):
+        """
+
         :return:
         """
         # show window search amplifier NeoRec
@@ -451,6 +464,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
+        print(event)
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
