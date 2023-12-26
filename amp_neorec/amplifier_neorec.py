@@ -15,7 +15,6 @@ class AMP_NeoRec(ModuleBase):
     """
     NeoRec devices module
     """
-
     disconnect_signal = pyqtSignal()
 
     def __init__(self, *args, **kwargs):
@@ -233,14 +232,12 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         if event.type == EventType.COMMAND:
-
             # check for stop command
             if event.info == "Stop":
                 if event.cmd_value == "force":
                     self.stop(force=True)
                 else:
                     self.stop()
-        pass
 
     def stop(self, force=False):
         """ Stop data acquisition
@@ -286,14 +283,19 @@ class AMP_NeoRec(ModuleBase):
         self.test_counter = 0
 
         # setup hardware
-        err = self.amp.setup(
+        flag = self.amp.setup(
             mode=self.recording_mode,
             rate=self.sample_rate["base"],
             range=self.dynamic_range["base"]
         )
 
-        # if err != NR_ERR_OK:
-        #     self.disconnect_signal.emit()
+        # case of disconnection
+        if not flag:
+            # set connection state
+            self.amp.connected = False
+            # emit signal start search device
+            self.disconnect_signal.emit()
+            raise ModuleError(self._object_name, "disconnected")
 
         self.update_receivers()
 

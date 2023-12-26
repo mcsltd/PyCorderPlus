@@ -122,6 +122,12 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get the top module
         self.topmodule = self.modules[0]
 
+        # get events from module chain top module
+        self.topmodule.signal_event.connect(self.processEvent)
+
+        # get the bottom module
+        self.bottommodule = self.modules[-1]
+
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.actionNeoRec.setDisabled(True)
@@ -138,9 +144,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # self.signal_search.connect(self.neorec_search)
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
-
-        # get the bottom module
-        self.bottommodule = self.modules[-1]
 
         # get signal panes for plot area
         self.horizontalLayout_SignalPane.removeItem(self.horizontalLayout_SignalPane.itemAt(0))
@@ -448,7 +451,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
@@ -459,7 +461,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # look for errors
         if (event.type == EventType.ERROR) and (event.severity > 1):
             self.topmodule.stop(force=True)
-        pass
 
     def closeEvent(self, event):
         """

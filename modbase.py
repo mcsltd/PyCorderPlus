@@ -44,7 +44,7 @@ import numpy as np
 from lxml import etree
 from lxml import objectify
 
-from PyQt6.QtCore import Qt, QObject
+from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from PyQt6 import QtCore
 
 # impedance value invalid (electrode disconnected)
@@ -348,6 +348,8 @@ class ModuleBase(QObject):
     """ Base class for all recording modules
     """
 
+    signal_event = pyqtSignal("PyQt_PyObject")
+
     def __init__(self, usethread=True, queuesize=20, name="ModuleBase", instance=0):
         ''' Create a new recording module object
         @param usethread: true if data transfer should be handled internally by worker thread
@@ -544,8 +546,8 @@ class ModuleBase(QObject):
         @param event: ModuleEvent object
         '''
         # ToDo: rewrite emit signal (https://www.riverbankcomputing.com/static/Docs/PyQt6/signals_slots.html)
-        # self.emit(Qt.SIGNAL('event(PyQt_PyObject)'), event)
         # self.emit(Qt.SIGNAL('parentevent(PyQt_PyObject)'), event)
+        self.signal_event.emit(event)
         pass
 
     def isRunning(self):

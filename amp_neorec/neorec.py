@@ -360,31 +360,35 @@ class NeoRec:
         :param mode: device mode, one of NR_MODE_ values
         :param rate: device sampling rate, one of NR_RATE_ values
         :param range: device dynamic range, one of NR_RATE_ values
+        :return: True if the amplifier setup was successful, False or not
         """
-
         # set amplifier settings
         self.settings.DataRate = rate
         self.settings.InputRanges = range
+
+        # set amplifier mode
+        self.mode.Mode = mode
 
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
 
         if err != NR_ERR_OK:
-            pass
+            return False
 
         # set event settings
         err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
 
         if err != NR_ERR_OK:
-            pass
+            return False
 
-        # set amplifier mode
-        self.mode.Mode = mode
         # transfer mode to amplifier
         err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
 
         if err != NR_ERR_OK:
-            pass
+            return False
+
+        # if OK return true
+        return True
 
     def read(self, indices, eegcount):
         """
