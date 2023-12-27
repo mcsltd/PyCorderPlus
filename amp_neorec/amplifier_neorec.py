@@ -182,7 +182,8 @@ class AMP_NeoRec(ModuleBase):
             self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.GND] = 1
 
     def _set_default_filter(self):
-        """ set all filter properties to HW filter values
+        """
+        Set all filter properties to HW filter values
         """
         for channel in self.channel_config:
             channel.highpass = 0.0  # high pass off
@@ -212,7 +213,8 @@ class AMP_NeoRec(ModuleBase):
         self.update_receivers()
 
     def _online_mode_changed(self, new_mode):
-        """ SIGNAL from online configuration pane if recording mode has changed
+        """
+        SIGNAL from online configuration pane if recording mode has changed
         """
         if self.amp.running:
             if not self.stop():
@@ -347,9 +349,9 @@ class AMP_NeoRec(ModuleBase):
             self.acquisitionTimeoutCounter += 1
 
             # about 5s timeout
-            if self.acquisitionTimeoutCounter > 1000:
+            if self.acquisitionTimeoutCounter > 500:
                 self.acquisitionTimeoutCounter = 0
-                print("Connection is broken. Stop...")
+                self.amp.connected = False
                 # add search device NeoRec signal
                 raise
 
@@ -421,21 +423,10 @@ class AMP_NeoRec(ModuleBase):
         Stop data acquisition and close hardware object
         :return:
         """
-        errors = 999
-        # try:
-        #     # errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount  # get number of device errors
-        # except:
-        #     pass
-
         try:
             self.amp.stop()
         except:
             pass
-
-        # send status info
-        # info = "Stop %s" % (NR_Modes[self.recording_mode])
-        # if (errors > 0) and (self.recording_mode != NR_MODE_IMPEDANCE):
-        #     info += " (device errors = %d)" % errors
 
         # update button state
         self.online_cfg.updateUI(-1)

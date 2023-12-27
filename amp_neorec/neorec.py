@@ -198,8 +198,9 @@ class NeoRec:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\amp_neorec\nb2mcs.dll"
-                self.lib = ctypes.windll.LoadLibrary(path)
+                self.lib = ctypes.windll.LoadLibrary(r"./amp_neorec/nb2mcs_x64.dll")
+            else:
+                self.lib = ctypes.windll.LoadLibrary(r"./amp_neorec/nb2mcs_x86.dll")
         except:
             self.lib = None
             if self.x64:
@@ -220,7 +221,7 @@ class NeoRec:
         if self.running:
             return
         if self.lib is None:
-            # raise AmpError("library nb2mcs.dll not available")
+            # raise AmpError("library nb2mcs_x64.dll not available")
             return
 
         while not self.connected:
@@ -273,7 +274,7 @@ class NeoRec:
 
     def stop(self):
         """
-        Stop data acquisition
+        Stop data acquisition.
         """
         if not self.running:
             return
@@ -288,27 +289,25 @@ class NeoRec:
 
     def close(self):
         """
-        Close hardware device
+        Close hardware device.
         """
         if self.lib is None:
             # raise AmpError("library ActiChamp_x86.dll not available")
             return
 
         if self.id != 0:
-
             if self.running:
                 self.stop()
-
             err = self.lib.nb2Close(self.id)
-
             if err == NR_ERR_OK:
                 self.lib.nb2ApiDone()
 
     def getSamplingRateBase(self, samplingrate):
-        ''' Get base sampling rate ID and divider for the requested sampling rate
+        """
+        Get base sampling rate ID and divider for the requested sampling rate
         @param samplingrate: requested sampling rate in Hz
         @return: base rate ID (-1 if not possible) and base rate divider
-        '''
+        """
         mindiv = 100000
         base = -1
         div = 1
