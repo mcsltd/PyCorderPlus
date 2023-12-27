@@ -138,6 +138,31 @@ NR_Models = {
     NR_MINI: "NeoRec mini",
 }
 
+class AmpError(Exception):
+    """
+    Generic amplifier exception
+    """
+    def __init__(self, value, errornr=0):
+        errortext = ""
+        if errornr == NR_ERR_ID:
+            errortext = "Invalid device ID"
+        elif errornr == NR_ERR_FAIL:
+            errortext = "Error while executing function"
+        elif errornr == NR_ERR_PARAM:
+            errortext = "Invalid parameter when calling a function"
+        elif errornr == NR_ERR_OBTAINED:
+            errortext = "Error when receiving service or feature"
+        elif errornr == NR_ERR_SUPPORT:
+            errortext = "Function is not supported"
+        errortext = errortext + " :%i" % errornr
+        if errornr != 0:
+            self.value = "NeoRec: " + str(value) + " -> " + errortext
+        else:
+            self.value = "NeoRec: " + str(value)
+
+    def __str__(self):
+        return self.value
+
 
 class NeoRec:
     def __init__(self):
