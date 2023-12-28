@@ -441,12 +441,12 @@ class AMP_ActiChamp(ModuleBase):
                 info = "Start %s at %.0fHz" % (CHAMP_Modes[self.recording_mode],
                                                self.eeg_data.sample_rate)
 
-        # ToDo: self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
-        # ToDo: send recording mode
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info=self.recording_mode,
-        #                             status_field="Mode"))
+        self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
+        # send recording mode
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info=self.recording_mode,
+                                    status_field="Mode"))
         # update button state
         self.online_cfg.updateUI(self.recording_mode)
 
@@ -495,8 +495,9 @@ class AMP_ActiChamp(ModuleBase):
         return state < 2, voltages.VDC
 
     def process_stop(self):
-        ''' Stop data acquisition and close hardware object
-        '''
+        """
+        Stop data acquisition and close hardware object
+        """
         errors = 999
         try:
             errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount  # get number of device errors
@@ -518,12 +519,12 @@ class AMP_ActiChamp(ModuleBase):
         if (errors > 0) and (self.recording_mode != CHAMP_MODE_IMPEDANCE) and (
                 self.recording_mode != CHAMP_MODE_LED_TEST):
             info += " (device errors = %d)" % errors
-        # ToDo: self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
+        self.send_event(ModuleEvent(self._object_name, EventType.LOGMESSAGE, info))
         # send recording mode
-        # ToDo: self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info=-1,  # stop
-        #                             status_field="Mode"))
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info=-1,  # stop
+                                    status_field="Mode"))
         # update button state
         self.online_cfg.updateUI(-1)
 

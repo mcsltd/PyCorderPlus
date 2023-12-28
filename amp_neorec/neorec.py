@@ -257,7 +257,7 @@ class NeoRec:
                 self.id = self.lib.nb2GetId(0)
                 # open this device
                 err = self.lib.nb2Open(self.id)
-                if err != NR_ERR_OK:
+                if err == NR_ERR_OK:
                     self.connected = True
 
         # get information about open device
@@ -395,19 +395,21 @@ class NeoRec:
 
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
+        print("err", err)
 
         if err != NR_ERR_OK:
             return False
 
         # set event settings
         err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
+        print("err", err)
 
         if err != NR_ERR_OK:
             return False
 
         # transfer mode to amplifier
         err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
-
+        print("err", err)
         if err != NR_ERR_OK:
             return False
 

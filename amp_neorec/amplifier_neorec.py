@@ -312,6 +312,12 @@ class AMP_NeoRec(ModuleBase):
         # set start time on first call
         self.start_time = datetime.datetime.now()
 
+        # send recording mode
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info=self.recording_mode,
+                                    status_field="Mode"))
+
         # update button state
         self.online_cfg.updateUI(self.recording_mode)
 
@@ -421,12 +427,17 @@ class AMP_NeoRec(ModuleBase):
     def process_stop(self):
         """
         Stop data acquisition and close hardware object
-        :return:
         """
         try:
             self.amp.stop()
         except:
             pass
+
+        # send recording mode
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info=-1,  # stop
+                                    status_field="Mode"))
 
         # update button state
         self.online_cfg.updateUI(-1)
