@@ -65,10 +65,10 @@ def InstantiateModules(name_amp):
     elif name_amp == AMP_NeoRec.__name__:
         modules = [
             AMP_NeoRec(),
-            # MNT_Recording(),
-            # TRG_Eeg(),
-            # StorageVision(),
-            # FLT_Eeg(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
             IMP_Display(),
             DISP_Scope(instance=0),
             # Receiver()
@@ -132,7 +132,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.actionNeoRec.setDisabled(True)
 
-            self.topmodule.disconnect_signal.connect(self._reconnect)
+            self.topmodule.disconnect_signal.connect(self.neorec_search)
 
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
@@ -196,7 +196,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
     def _reconnect(self):
         """
-
         :return:
         """
         # show window search amplifier NeoRec
@@ -484,6 +483,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             event.ignore()
         else:
             self.topmodule.stop()
+
+            if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
+                print("close")
+                self.dlgConn.close()
+
             self.savePreferences()
             # clean up modules
             for module in flatten(self.modules):
@@ -694,7 +698,6 @@ def main(args):
 
     res = MainWindow.RESTART
     while res == MainWindow.RESTART:
-
         app = QApplication(sys.argv)
         win = MainWindow()
         win.showMaximized()
