@@ -128,5 +128,5 @@ class Ui_MainWindow(object):
         self.actionSave_Configuration.setText(_translate("MainWindow", "Save Configuration ..."))
         self.actionDefault_Configuration.setText(_translate("MainWindow", "Reset Configuration"))
         self.actionNeoRec.setText(_translate("MainWindow", "NeoRec (NeoRec cap, NeoRec 21)"))
-        self.actionActiCHamp_Plus.setText(_translate("MainWindow", "ActiCHamp Plus"))
+        self.actionActiCHamp_Plus.setText(_translate("MainWindow", "actiCHamp Plus"))
 

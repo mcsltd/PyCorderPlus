@@ -23,7 +23,7 @@
    <item row="0" column="0">
     <widget class="QGroupBox" name="groupBoxMode">
      <property name="title">
-      <string>actiCHamp</string>
+      <string>actiCHamp Plus</string>
      </property>
      <property name="flat">
       <bool>false</bool>

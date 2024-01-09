@@ -802,7 +802,7 @@ class AMP_ActiChamp(ModuleBase):
         if self.amp.getEmulationMode() > 0:
             self.online_cfg.groupBoxMode.setTitle("Amplifier SIMULATION")
         else:
-            self.online_cfg.groupBoxMode.setTitle("actiCHamp")
+            self.online_cfg.groupBoxMode.setTitle("actiCHamp Plus")
 
         # create channel selection maps
         if AMP_MONTAGE:

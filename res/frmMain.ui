@@ -208,7 +208,7 @@
   </action>
   <action name="actionActiCHamp_Plus">
    <property name="text">
-    <string>ActiCHamp Plus</string>
+    <string>actiCHamp Plus</string>
    </property>
   </action>
  </widget>
