@@ -302,6 +302,9 @@ class AMP_NeoRec(ModuleBase):
         self.battery_timer = 0
         self.test_counter = 0
 
+        # check battery
+        self._check_battery()
+
         # setup hardware
         flag = self.amp.setup(
             mode=self.recording_mode,
@@ -323,9 +326,6 @@ class AMP_NeoRec(ModuleBase):
         if len(self.channel_indices) == 0:
             raise
 
-        # check battery
-        # self._check_battery()
-
         # start hardware
         self.amp.start()
 
@@ -346,6 +346,14 @@ class AMP_NeoRec(ModuleBase):
         self.blocking_counter = 0
         self.initialErrorCount = -1
 
+    def _check_battery(self):
+        """
+        Check Amplifier NeoRec battery
+        :return:
+        """
+        # read battery state
+        self.amp.getBatteryInfo()
+
     def process_output(self):
         """
         Get data from amplifier
@@ -357,6 +365,9 @@ class AMP_NeoRec(ModuleBase):
         self.recordtime = 0.0
 
         # check battery voltage every 5s
+        if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
+            self._check_battery()
+            self.battery_timer = t
 
         if self.recording_mode == NR_MODE_IMPEDANCE:
             return self.process_impedance()

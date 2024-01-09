@@ -137,6 +137,16 @@ class t_nb2Adjusment(ctypes.Structure):
         ("Dithering", ctypes.c_uint8),
     ]
 
+class t_nb2BatteryProperties(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("Capacity", ctypes.c_uint16),
+        ("Level", ctypes.c_uint16),
+        ("Voltage", ctypes.c_uint16),
+        ("Current", ctypes.c_int16),
+        ("Temperature", ctypes.c_int16)
+    ]
+
 
 # channel names for NeoRec 21 and NeoRec21S devices
 NR_NAME_CHANNEL_EEG21 = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3",
@@ -591,6 +601,24 @@ class NeoRec:
         # channel order in buffer is CH1,CH2..CHn, GND
         items = self.CountEeg + 1
         return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+
+    def getBatteryInfo(self):
+        """
+        Read the amplifier battery information
+        :return:
+        """
+        battery = t_nb2BatteryProperties()
+
+        if self.id == 0 or self.lib is None:
+            return
+
+        # get amplifier battery info
+        err = self.lib.nb2GetBattery(self.id, ctypes.byref(battery))
+        if err != NR_ERR_OK:
+            return
+
+        # print("Current", battery.Current)
+
 
 # if __name__ == "__main__":
 #     obj = NeoRec()
