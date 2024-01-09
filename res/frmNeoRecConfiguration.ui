@@ -150,12 +150,12 @@
         <widget class="QComboBox" name="comboBoxPerformanceMode">
          <item>
           <property name="text">
-           <string>Optimum</string>
+           <string>Maximum</string>
           </property>
          </item>
          <item>
           <property name="text">
-           <string>Maximum</string>
+           <string>Optimum</string>
           </property>
          </item>
         </widget>

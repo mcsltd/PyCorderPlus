@@ -108,8 +108,8 @@ class Ui_frmNeoRecConfig(object):
         self.label_MSSamplingRate.setText(_translate("frmNeoRecConfig", "[Hz]"))
         self.label_MSDynamicRange.setText(_translate("frmNeoRecConfig", "[mV]"))
         self.labelPerformanceMode.setText(_translate("frmNeoRecConfig", "Performance Mode"))
-        self.comboBoxPerformanceMode.setItemText(0, _translate("frmNeoRecConfig", "Optimum"))
-        self.comboBoxPerformanceMode.setItemText(1, _translate("frmNeoRecConfig", "Maximum"))
+        self.comboBoxPerformanceMode.setItemText(0, _translate("frmNeoRecConfig", "Maximum"))
+        self.comboBoxPerformanceMode.setItemText(1, _translate("frmNeoRecConfig", "Optimum"))
         self.label.setText(_translate("frmNeoRecConfig", "Amplifier: NeoRec\n"
 "\n"
 "Available channels: 0 EEG"))

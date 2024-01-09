@@ -46,8 +46,15 @@ class AMP_NeoRec(ModuleBase):
             base = self.amp.getDynamicRangeBase(range)
             self.dynamic_ranges.append({"range": str(range), "base": base})
 
+        # create dictionary of possible performance modes
+        self.performance_modes = [{"mode": "Maximum", "base": NR_BOOST_MAXIMUM},
+                                  {"mode": "Optimal", "base": NR_BOOST_OPTIMUM}]
+
+        # default setup for sample rate, dynamic range, performance mode
         self.sample_rate = self.sample_rates[0]
         self.dynamic_range = self.dynamic_ranges[0]
+        self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]
+
         self.binning = self.sample_rate['div']
         self.binningoffset = 0
 
@@ -92,6 +99,7 @@ class AMP_NeoRec(ModuleBase):
         self.amp.readConfiguration(
             rate=self.sample_rate["base"],
             range=self.dynamic_range["base"],
+            boost=self.performance_mode["base"],
             force=True
         )
         self.update_receivers()
@@ -100,6 +108,7 @@ class AMP_NeoRec(ModuleBase):
         config = _DeviceConfigurationPane(self)
         config.rateChanged.connect(self._samplerate_changed)
         config.rangeChanged.connect(self._dynamicrange_changed)
+        config.modeChanged.connect(self._performancemode_changed)
         return config
 
     def _dynamicrange_changed(self, index):
@@ -107,6 +116,13 @@ class AMP_NeoRec(ModuleBase):
         """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         self.dynamic_range = self.dynamic_ranges[index]
+        self.update_receivers()
+        QApplication.restoreOverrideCursor()
+
+    def _performancemode_changed(self, index):
+        """ SIGNAL from configuration pane if performance mode has changed"""
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.performance_mode = self.performance_modes[index]
         self.update_receivers()
         QApplication.restoreOverrideCursor()
 
@@ -196,6 +212,7 @@ class AMP_NeoRec(ModuleBase):
         """
         self.sample_rate = self.sample_rates[0]  # 125Hz sample rate
         self.dynamic_range = self.dynamic_ranges[0]  # 150 mV dynamic range
+        self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]   # mode Optimal
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
@@ -265,6 +282,7 @@ class AMP_NeoRec(ModuleBase):
             self.amp.readConfiguration(
                 rate=self.sample_rate["base"],
                 range=self.dynamic_range["base"],
+                boost=self.performance_mode["base"],
             )
         except Exception as err:
             pass
@@ -288,7 +306,8 @@ class AMP_NeoRec(ModuleBase):
         flag = self.amp.setup(
             mode=self.recording_mode,
             rate=self.sample_rate["base"],
-            range=self.dynamic_range["base"]
+            range=self.dynamic_range["base"],
+            boost=self.performance_mode["base"]
         )
 
         # case of disconnection
@@ -305,6 +324,7 @@ class AMP_NeoRec(ModuleBase):
             raise
 
         # check battery
+        # self._check_battery()
 
         # start hardware
         self.amp.start()
@@ -547,8 +567,10 @@ Amplifier module configuration GUI.
 
 
 class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
+
     rateChanged = pyqtSignal(int)
     rangeChanged = pyqtSignal(int)
+    modeChanged = pyqtSignal(int)
 
     # dataChanged = pyqtSignal()
     def __init__(self, amplifier, *args):
@@ -565,12 +587,22 @@ class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig
         self.comboBoxSampleRate.setCurrentIndex(self.amplifier.sample_rate["base"])
         # set current index in combobox Dynamic Range
         self.comboBoxDynamicRange.setCurrentIndex(self.amplifier.dynamic_range["base"])
+        # set current index in combobox Performance Mode
+        self.comboBoxPerformanceMode.setCurrentIndex(self.amplifier.performance_mode["base"])
 
         self._updateAvailableChannels()
 
         # actions
         self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
         self.comboBoxDynamicRange.currentIndexChanged.connect(self._dynamicrange_changed)
+        self.comboBoxPerformanceMode.currentIndexChanged.connect(self._performancemode_changed)
+
+    def _performancemode_changed(self, index):
+        """ SIGNAL sample rate combobox value has changed """
+        if index >= 0:
+            # notify parent about changes
+            self.modeChanged.emit(index)
+            self._updateAvailableChannels()
 
     def _samplerate_changed(self, index):
         """ SIGNAL sample rate combobox value has changed """

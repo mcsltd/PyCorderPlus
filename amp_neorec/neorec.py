@@ -29,6 +29,9 @@ dynamic_range = {
     300.0: NR_RANGE_mV300
 }
 
+# performance mode
+
+
 # C error numbers
 NR_ERR_OK = 0  # Success (no errors)
 NR_ERR_ID = -1  # Invalid id
@@ -382,22 +385,28 @@ class NeoRec:
             base = dynamic_range[range]
         return base
 
-    def readConfiguration(self, rate, range, force=False):
+
+    def readConfiguration(self, rate, range, boost, force=False):
         """
         Update device sampling rate, dymamic range and get new configuration
         @param rate: device base sampling rate
         :param range: device base dynamic range
+        :param boost: device base performance mode
         :param force:
         """
-        # not possible if device is already open or not necessary if rate or range has not changed
-        if (self.id != 0 and rate == self.settings.DataRate and range == self.settings.InputRange) and not force:
+        # not possible if device is already open or not necessary if rate, range, performance mode has not changed
+        if (self.id != 0 and
+            rate == self.settings.DataRate and
+            range == self.settings.InputRange)\
+                and not force:
             return
         # update sampling rate and get new configuration
         try:
             self.setup(
                 mode=self.mode.Mode,
                 rate=rate,
-                range=range
+                range=range,
+                boost=boost
             )
         except:
             pass
