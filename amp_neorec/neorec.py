@@ -213,6 +213,11 @@ class NeoRec:
         self.settings.InputRange = NR_RANGE_mV150  #: input range
         self.settings.EnabledChannels = 0x001FFFFF  #: enabled channels
 
+        # set default adjusment
+        self.adjusment = t_nb2Adjusment()
+        self.adjusment.Boost = NR_BOOST_OPTIMUM
+        self.adjusment.Dithering = NR_DITHERING_MINIMUM
+
         # set default mode
         self.mode = t_nb2Mode()  #: NeoRecCap settings mode structure
         self.mode.Mode = NR_MODE_DATA
