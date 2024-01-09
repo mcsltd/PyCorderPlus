@@ -47,6 +47,15 @@ NR_Modes = {
     NR_MODE_IMPEDANCE: "impedance measurement"
 }
 
+# Performance mode
+NR_BOOST_MAXIMUM = 0
+NR_BOOST_OPTIMUM = 1
+
+# Dithering mode
+NR_DITHERING_MAXIMUM = 0
+NR_DITHERING_MEDIUM = 1
+NR_DITHERING_MINIMUM = 1
+NR_DITHERING_OFF = 3
 
 class t_nb2Date(ctypes.Structure):
     _pack_ = 1
@@ -114,6 +123,14 @@ class t_nb2EventSettings(ctypes.Structure):
     _fields_ = [
         ('EnabledEvents', ctypes.c_uint16),
         ('ActivityThreshold', ctypes.c_uint16)
+    ]
+
+
+class t_nb2Adjusment(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("Boost", ctypes.c_uint8),
+        ("Dithering", ctypes.c_uint8),
     ]
 
 
