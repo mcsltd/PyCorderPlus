@@ -54,11 +54,11 @@ def InstantiateModules(name_amp):
     if name_amp == AMP_ActiChamp.__name__:
         modules = [
             AMP_ActiChamp(),
-            # MNT_Recording(),
-            # TRG_Eeg(),
-            # StorageVision(),
-            # FLT_Eeg(),
-            # IMP_Display(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
             DISP_Scope(instance=0),
             # Receiver()
         ]
@@ -82,10 +82,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     Application Main Window Class
     includes main menu, status bar and module handling
     """
+    signal_parentevent = pyqtSignal("PyQt_PyObject")
+
     RESTART = 1
 
     def __init__(self):
-
         super().__init__()
         self.setupUi(self)
 
@@ -124,6 +125,8 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get events from module chain top module
         self.topmodule.signal_event.connect(self.processEvent)
+        # tell the top module to get events from us
+        self.signal_parentevent.connect(self.topmodule.parent_event, Qt.ConnectionType.QueuedConnection)
 
         # get the bottom module
         self.bottommodule = self.modules[-1]
@@ -463,7 +466,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-        print(event)
+        # print(event)
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
@@ -479,14 +482,16 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         """
         Application wants to close, prevent closing if recording to file is still active
         """
+
         if not self.topmodule.query("Stop"):
             event.ignore()
         else:
-            self.topmodule.stop()
+            self.topmodule.stop(force=True)
 
             if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
-                print("close")
-                self.dlgConn.close()
+                # Shutting down the API and disabling the BLE device
+                self.topmodule.amp.close()
+                # self.dlgConn.close()
 
             self.savePreferences()
             # clean up modules
@@ -496,6 +501,12 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # if self.RC != None:
             #     self.RC.terminate()
             event.accept()
+
+    def sendEvent(self, event):
+        """
+        Send an event to the top module event chain
+        """
+        self.signal_parentevent.emit(event)
 
     def configurationClicked(self):
         """ Configuration button clicked
@@ -685,17 +696,6 @@ def main(args):
     Create and start up main application
     """
 
-    # configuration_dir, \
-    #     configuration_file, \
-    #     name_amplifier, log_dir = load_preferences()
-    #
-    # app = QApplication(sys.argv)
-    # dlg = DlgAmpTypeSelection()
-    # dlg.show()
-    # app.exec()
-    # del app
-    # name_amplifier = dlg.name_amp
-
     res = MainWindow.RESTART
     while res == MainWindow.RESTART:
         app = QApplication(sys.argv)
@@ -705,7 +705,6 @@ def main(args):
 
         del app
         del win
-
 
 
 if __name__ == "__main__":

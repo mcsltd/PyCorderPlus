@@ -143,7 +143,7 @@ class t_nb2BatteryProperties(ctypes.Structure):
         ("Capacity", ctypes.c_uint16),
         ("Level", ctypes.c_uint16),
         ("Voltage", ctypes.c_uint16),
-        ("Current", ctypes.c_int16),
+        ("Current", ctypes.c_int16),    # mA
         ("Temperature", ctypes.c_int16)
     ]
 

@@ -457,7 +457,7 @@ class AMP_NeoRec(ModuleBase):
 
     def process_stop(self):
         """
-        Stop data acquisition and close hardware object
+        Stop data acquisition and stop hardware object
         """
         try:
             self.amp.stop()
