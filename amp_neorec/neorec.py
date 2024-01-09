@@ -57,6 +57,7 @@ NR_DITHERING_MEDIUM = 1
 NR_DITHERING_MINIMUM = 1
 NR_DITHERING_OFF = 3
 
+
 class t_nb2Date(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
@@ -155,10 +156,12 @@ NR_Models = {
     NR_MINI: "NeoRec mini",
 }
 
+
 class AmpError(Exception):
     """
     Generic amplifier exception
     """
+
     def __init__(self, value, errornr=0):
         errortext = ""
         if errornr == NR_ERR_ID:
@@ -399,13 +402,13 @@ class NeoRec:
         except:
             pass
 
-
-    def setup(self, mode, rate, range):
+    def setup(self, mode, rate, range, boost):
         """
         Prepare device for acquisition
         :param mode: device mode, one of NR_MODE_ values
         :param rate: device sampling rate, one of NR_RATE_ values
-        :param range: device dynamic range, one of NR_RATE_ values
+        :param range: device dynamic range, one of NR_RANGE_ values
+        :param boost: device performance mode, one of NR_BOOST_ values
         :return: True if the amplifier setup was successful, False or not
         """
         # set amplifier settings
@@ -415,23 +418,26 @@ class NeoRec:
         # set amplifier mode
         self.mode.Mode = mode
 
+        # set amplifier performance mode
+        self.adjusment.Boost = boost
+
+        # transfer adjusment to amplifier
+        err = self.lib.nb2SetAdjustment(self.id, ctypes.byref(self.adjusment))
+        if err != NR_ERR_OK:
+            return False
+
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
-        print("err", err)
-
         if err != NR_ERR_OK:
             return False
 
         # set event settings
         err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
-        print("err", err)
-
         if err != NR_ERR_OK:
             return False
 
         # transfer mode to amplifier
         err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
-        print("err", err)
         if err != NR_ERR_OK:
             return False
 
@@ -576,7 +582,6 @@ class NeoRec:
         # channel order in buffer is CH1,CH2..CHn, GND
         items = self.CountEeg + 1
         return np.fromstring(self.impbuffer, np.uint32, items), disconnected
-
 
 # if __name__ == "__main__":
 #     obj = NeoRec()
