@@ -376,6 +376,82 @@ class AMP_ActiChamp(ModuleBase):
         ModuleBase.stop(self)
         return True
 
+    def process_event(self, event):
+        """
+        Handle events from attached receivers
+        @param event: ModuleEvent
+        """
+        # Command events
+        if event.type == EventType.COMMAND:
+            # check for new impedance color range values
+            if event.info == "ImpColorRange":
+                good, bad = event.cmd_value
+
+                if self.recording_mode == CHAMP_MODE_IMPEDANCE:
+                    self._thLock.acquire()
+                    try:
+                        self.amp.setImpedanceRange(good * 1000, bad * 1000)
+                        self._thLock.release()
+                    except Exception as e:
+                        self._thLock.release()
+                        self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+
+            # check for stop command
+            if event.info == "Stop":
+                if event.cmd_value == "force":
+                    self.stop(force=True)
+                else:
+                    self.stop()
+
+            # check for recording start command
+            if event.info == "StartRecording":
+                self._online_mode_changed(CHAMP_MODE_NORMAL)
+
+            # check for impedance start command
+            if event.info == "StartImpedance":
+                self._online_mode_changed(CHAMP_MODE_IMPEDANCE)
+
+            # check for trigger out command
+            if event.info == "TriggerOut":
+                self._thLock.acquire()
+                try:
+                    self.amp.setTrigger(event.cmd_value)
+                    self._thLock.release()
+                except Exception as e:
+                    self._thLock.release()
+                    self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+
+            # check for button LED command
+            # cmd_value is a tuple with period and duty cycle
+            if event.info == "SetLED":
+                self._thLock.acquire()
+                try:
+                    self.amp.setButtonLed(event.cmd_value[0], event.cmd_value[1])
+                    self._thLock.release()
+                except Exception as e:
+                    self._thLock.release()
+                    self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+
+            # check for acitve shield gain command
+            # cmd_value is the gain from 1 to 100
+            if event.info == "SetShieldGain":
+                self._thLock.acquire()
+                self.amp.activeShieldGain = event.cmd_value
+                self._thLock.release()
+
+        # Error events
+        if event.type == EventType.ERROR or event.type == EventType.LOG:
+            # add device status info to "sample missing" events
+            if "samples missing" in event.info:
+                self._thLock.acquire()
+                try:
+                    errors = self.amp.getDeviceStatus()[1] - self.initialErrorCount
+                    event.info += " (device errors = %d)" % errors
+                    self._thLock.release()
+                except Exception as e:
+                    self._thLock.release()
+                    event.info += " (%s)" % (str(e))
+
     def _set_default_filter(self):
         """ set all filter properties to HW filter values
         """
@@ -726,7 +802,7 @@ class AMP_ActiChamp(ModuleBase):
         if self.amp.getEmulationMode() > 0:
             self.online_cfg.groupBoxMode.setTitle("Amplifier SIMULATION")
         else:
-            self.online_cfg.groupBoxMode.setTitle("Amplifier")
+            self.online_cfg.groupBoxMode.setTitle("actiCHamp")
 
         # create channel selection maps
         if AMP_MONTAGE:
@@ -849,6 +925,8 @@ class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
         super().__init__()
         self.setupUi(self)
         self.amp = amp
+
+        self.groupBoxMode.setTitle("Amplifier actiCHamp")
 
         # set default values
         self.pushButtonStop.setChecked(True)

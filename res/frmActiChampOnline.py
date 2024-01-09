@@ -96,7 +96,7 @@ class Ui_frmActiChampOnline(object):
     def retranslateUi(self, frmActiChampOnline):
         _translate = QtCore.QCoreApplication.translate
         frmActiChampOnline.setWindowTitle(_translate("frmActiChampOnline", "Frame"))
-        self.groupBoxMode.setTitle(_translate("frmActiChampOnline", "Amplifier"))
+        self.groupBoxMode.setTitle(_translate("frmActiChampOnline", "actiCHamp"))
         self.pushButtonStartDefault.setText(_translate("frmActiChampOnline", "Default\n"
 "Mode"))
         self.pushButtonStartShielding.setText(_translate("frmActiChampOnline", "Shielding\n"

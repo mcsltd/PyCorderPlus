@@ -78,7 +78,7 @@ class Ui_frmNeoRecOnline(object):
     def retranslateUi(self, frmNeoRecOnline):
         _translate = QtCore.QCoreApplication.translate
         frmNeoRecOnline.setWindowTitle(_translate("frmNeoRecOnline", "Frame"))
-        self.groupBoxMode.setTitle(_translate("frmNeoRecOnline", "Amplifier NeoRec"))
+        self.groupBoxMode.setTitle(_translate("frmNeoRecOnline", "NeoRec"))
         self.pushButtonStartDefault.setText(_translate("frmNeoRecOnline", "Default\n"
 "Mode"))
         self.pushButtonStop.setText(_translate("frmNeoRecOnline", "Stop"))
