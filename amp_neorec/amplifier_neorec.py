@@ -187,7 +187,6 @@ class AMP_NeoRec(ModuleBase):
 
         return res
 
-
     def _prepare_mode_and_filters(self):
         # translate recording modes
         if self.recording_mode == NR_MODE_DATA:
@@ -589,6 +588,34 @@ class AMP_NeoRec(ModuleBase):
                     self.max_aux_channels,
                     eeg_ch_names=NR_NAME_CHANNEL_EEG21S
                 )
+
+    def getXML(self):
+        """
+        Get properties for XML configuration file
+        :return: objectify XML element
+            <NeoRec instance="0" module="amplifier">
+                <model>1902</model>
+                <channels>
+                    ...
+                </channels>
+                <samplerate>1000</samplerate>
+                <dynamicrange>0</dynamicrange>
+                <performancemode>1</performancemode>
+
+            </NeoRec>
+        """
+        E = objectify.E
+
+        amplifier = E.AMP_NeoRec(
+            E.model(self.model),
+            E.samplerate(self.sample_rate['value']),
+            E.dynamicrange(self.dynamic_range["base"]),
+            E.performancemode(self.performance_mode["base"]),
+            instance=str(self._instance),
+            module="amplifier"
+        )
+
+        return amplifier
 
 
 """
