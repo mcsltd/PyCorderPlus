@@ -140,11 +140,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
             self.dlgConn.signal_hide.connect(self.dlgConn._hide)
+
             # activate search neorec
             self.neorec_search()
 
             # # actions to find a NeoRec amplifier
             # self.signal_search.connect(self.neorec_search)
+
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
 
@@ -176,7 +178,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             else:
                 self.defaultConfiguration()
         except:
-            pass
+            self.defaultConfiguration()
 
         # update log text module info
         # self.updateModuleInfo()
@@ -195,6 +197,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # start searching for an amplifier
         conn = threading.Thread(target=self._search)
         conn.start()
+        # conn.join()
         pass
 
     def _reconnect(self):
