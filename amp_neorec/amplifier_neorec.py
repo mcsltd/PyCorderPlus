@@ -213,6 +213,7 @@ class AMP_NeoRec(ModuleBase):
         self.sample_rate = self.sample_rates[0]  # 125Hz sample rate
         self.dynamic_range = self.dynamic_ranges[0]  # 150 mV dynamic range
         self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]   # mode Optimal
+
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
@@ -221,6 +222,7 @@ class AMP_NeoRec(ModuleBase):
                     channel.isReference = True  # use first channel as reference
             else:
                 channel.enable = False  # disable all AUX channels
+
         self._set_default_filter()
 
         # if NeoRec is connected, set the appropriate channel names
@@ -445,6 +447,7 @@ class AMP_NeoRec(ModuleBase):
             # remove all disabled reference channels
             if len(self.ref_remove_index) > 0:
                 self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
+
         # calculate date and time for the first sample of this block in s
         sampletime = int(self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate)
         self.eeg_data.block_time = self.start_time + datetime.timedelta(seconds=sampletime)

@@ -137,13 +137,14 @@ class t_nb2Adjusment(ctypes.Structure):
         ("Dithering", ctypes.c_uint8),
     ]
 
+
 class t_nb2BatteryProperties(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("Capacity", ctypes.c_uint16),
         ("Level", ctypes.c_uint16),
         ("Voltage", ctypes.c_uint16),
-        ("Current", ctypes.c_int16),    # mA
+        ("Current", ctypes.c_int16),  # mA
         ("Temperature", ctypes.c_int16)
     ]
 
@@ -312,6 +313,14 @@ class NeoRec:
         if err != NR_ERR_OK:
             return False
 
+        # get device possibility
+        pos = t_nb2Possibility()
+        err = self.lib.nb2GetPossibility(self.id, ctypes.byref(pos))
+        if err != NR_ERR_OK:
+            return False
+
+        # setting the number of channels depending on the model type
+        self.CountEeg = pos.ChannelsCount
         return True
 
     def start(self):
@@ -395,7 +404,6 @@ class NeoRec:
             base = dynamic_range[range]
         return base
 
-
     def readConfiguration(self, rate, range, boost, force=False):
         """
         Update device sampling rate, dymamic range and get new configuration
@@ -407,7 +415,7 @@ class NeoRec:
         # not possible if device is already open or not necessary if rate, range, performance mode has not changed
         if (self.id != 0 and
             rate == self.settings.DataRate and
-            range == self.settings.InputRange)\
+            range == self.settings.InputRange) \
                 and not force:
             return
         # update sampling rate and get new configuration
@@ -618,7 +626,6 @@ class NeoRec:
             return
 
         # print("Current", battery.Current)
-
 
 # if __name__ == "__main__":
 #     obj = NeoRec()
