@@ -320,7 +320,7 @@ class NeoRec:
             return False
 
         # setting the number of channels depending on the model type
-        self.CountEeg = pos.ChannelsCount
+        # self.CountEeg = pos.ChannelsCount
         return True
 
     def start(self):

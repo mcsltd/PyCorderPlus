@@ -135,7 +135,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.actionNeoRec.setDisabled(True)
 
-            self.topmodule.disconnect_signal.connect(self.neorec_search)
+            # self.topmodule.disconnect_signal.connect(self.neorec_search)
 
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
@@ -214,7 +214,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         Activation of the NeoRec amplifier search thread
         :return:
         """
-        res = self.topmodule.amp.open()
+        res = self.topmodule.connection()
         if res:
             self.topmodule.set_info()
             self.dlgConn.signal_hide.emit()

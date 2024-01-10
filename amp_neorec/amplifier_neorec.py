@@ -172,6 +172,22 @@ class AMP_NeoRec(ModuleBase):
         # prepare recording mode and anti aliasing filters
         self._prepare_mode_and_filters()
 
+    def connection(self):
+        """
+        NeoRec amplifier detection and opening
+        :return:
+        """
+        # search, open and get NeoRec properties
+        res = self.amp.open()
+
+        # if res == NR_ERR_OK and self.amp.CountEeg != self.max_eeg_channels:
+        #     # self.channel_config = EEG_DataBlock.get_default_properties(self.max_eeg_channels, self.max_aux_channels)
+        #     self._create_all_channel_selection()
+        #     self.update_receivers()
+
+        return res
+
+
     def _prepare_mode_and_filters(self):
         # translate recording modes
         if self.recording_mode == NR_MODE_DATA:
