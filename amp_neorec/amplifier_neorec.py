@@ -1,4 +1,5 @@
 import time
+from operator import itemgetter
 
 from modbase import *
 from amp_neorec.neorec import *
@@ -616,6 +617,48 @@ class AMP_NeoRec(ModuleBase):
         )
 
         return amplifier
+
+    def setXML(self, xml):
+        """
+        Set module properties from XML configuration file,
+        :param xml: complete objectify XML configuration tree,
+        module will search for matching values
+        """
+        # search my configuration data
+        amps = xml.xpath("//AMP_NeoRec[@module='amplifier' and @instance='%i']" % self._instance)
+        if len(amps) == 0:
+            return  # configuration data not found, leave everything unchanged
+
+        cfg = amps[0]  # we should have only one amplifier instance from this type
+
+        # check version, has to be lower or equal than current version
+        # version = cfg.get("version")
+
+        # get the values
+        try:
+            # reset filter properties to default values (because configuration has been moved to filter module)
+            self._set_default_filter()
+
+            # set number model
+            self.model = cfg.model.pyval
+            # If the model of the connected device and the model from the settings are different,
+            # the settings will be reset
+
+            # set closest matching sample rate
+            sr = cfg.samplerate.pyval
+            for rate in sorted(self.sample_rates, key=itemgetter('value')):
+                if rate["value"] >= sr:
+                    self.sample_rate = rate
+                    break
+
+            # set dynamic range
+            self.dynamic_range = self.dynamic_ranges[cfg.dynamicrange.pyval]
+
+            # set performance mode
+            self.performance_mode = self.performance_modes[cfg.performancemode.pyval]
+
+        except Exception as e:
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
 
 
 """
