@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLa
     QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap, QFont, QScreen
 from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
 """
 Import GUI resources.
@@ -133,17 +134,18 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
+            self.stop_search = False
             self.actionNeoRec.setDisabled(True)
-
-            # self.topmodule.disconnect_signal.connect(self.neorec_search)
 
             # show a window while searching for an amplifier
             self.dlgConn = DlgConnectionNeoRec(self)
             self.dlgConn.signal_hide.connect(self.dlgConn._hide)
+            self.dlgConn.signal_stop_search.connect(self.change_stop_search)
 
-            # activate search neorec
+            # activate search NeoRec
             self.neorec_search()
 
+            # self.topmodule.disconnect_signal.connect(self.neorec_search)
             # # actions to find a NeoRec amplifier
             # self.signal_search.connect(self.neorec_search)
 
@@ -186,6 +188,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # update button states
         self.updateUI()
 
+    def change_stop_search(self, flag):
+        self.stop_search = flag
+
     def neorec_search(self):
         """
         Launching the NeoRec amplifier search window on the network
@@ -217,10 +222,34 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         Activation of the NeoRec amplifier search thread
         :return:
         """
+        if self.check_bluetooth() == QBluetoothLocalDevice.HostMode.HostPoweredOff:
+            self.dlgConn.set_text_bluetooth_on()
+
+        # checking when the user turns on bluetooth
+        res = self.check_bluetooth()
+        while res != QBluetoothLocalDevice.HostMode.HostConnectable and not self.stop_search:
+            res = self.check_bluetooth()
+
+        if self.stop_search:
+            return
+
+        if res == QBluetoothLocalDevice.HostMode.HostConnectable:
+            self.dlgConn.set_text_bluetooth_search()
+
+        # amplifier search
         res = self.topmodule.connection()
+
         if res:
             self.topmodule.set_info()
             self.dlgConn.signal_hide.emit()
+
+    def check_bluetooth(self):
+        """
+        Checks Bluetooth status
+        :return:
+        """
+        res = QBluetoothLocalDevice().hostMode()
+        return res
 
     def _restart(self):
         """
@@ -541,6 +570,8 @@ NeoRec amplifier search window
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
     signal_hide = pyqtSignal()
+    signal_on = pyqtSignal()
+    signal_stop_search = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -549,7 +580,9 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
 
         self.label.setPixmap(QPixmap("res/press_button.png"))
 
-        self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
+        # self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
+        # set text by default in label
+        self.set_text_bluetooth_search()
         self.label_2.setFont(QFont("Ms Shell Dlg 2", 8))
 
         self.setFixedSize(self.size())
@@ -558,6 +591,12 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
         # x = (screen_size.width() - parent.width()) // 2
         # y = (screen_size.height() - parent.height()) // 2
         # self.move(x, y)
+
+    def set_text_bluetooth_on(self):
+        self.label_2.setText("Please turn on Bluetooth...")
+
+    def set_text_bluetooth_search(self):
+        self.label_2.setText("The Bluetooth network is searching for a NeoRec amplifier...")
 
     def _hide(self):
         self.hide()
@@ -568,6 +607,7 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                       QMessageBox.StandardButton.No)
         if result == QMessageBox.StandardButton.Yes:
+            self.signal_stop_search.emit(True)
             self.close()
         else:
             event.ignore()
