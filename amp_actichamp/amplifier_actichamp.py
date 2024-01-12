@@ -473,6 +473,12 @@ class AMP_ActiChamp(ModuleBase):
         for ch in self.channel_config[ref_index[1:]]:
             ch.isReference = False
 
+    def get_module_info(self):
+        """ Get information about this module for the about dialog
+        @return: Serial numbers of amplifier and modules
+        """
+        return self.amp.getDeviceInfoString()
+
     def process_start(self):
         """ Open amplifier hardware and start data acquisition
         """
@@ -508,7 +514,8 @@ class AMP_ActiChamp(ModuleBase):
 
         # send status info
         if AMP_MONTAGE:
-            info = "Start %s at %.0fHz with %d channels" % (CHAMP_Modes[self.recording_mode], self.eeg_data.sample_rate,
+            info = "Start %s at %.0fHz with %d channels" % (CHAMP_Modes[self.recording_mode],
+                                                            self.eeg_data.sample_rate,
                                                             len(self.channel_indices))
         else:
             if self.amp.hasPllOption() and self.amp.PllExternal:
@@ -533,9 +540,9 @@ class AMP_ActiChamp(ModuleBase):
         self.initialErrorCount = -1
 
     def _check_battery(self):
-        ''' Check amplifier battery voltages
+        """ Check amplifier battery voltages
         @return: state (ok=True, bad=False) and voltage
-        '''
+        """
         # read battery state and internal voltages from amplifier
         state, voltages, faultyVoltages = self.amp.getBatteryVoltage()
         severe = ErrorSeverity.IGNORE
@@ -553,10 +560,10 @@ class AMP_ActiChamp(ModuleBase):
                 v_warning += " %s" % u
             # warning already sent?
             if v_warning != self.voltage_warning:
-                # ToDo: self.send_event(ModuleEvent(self._object_name,
-                #                             EventType.ERROR,
-                #                             info=v_warning,
-                #                             severity=severe))
+                self.send_event(ModuleEvent(self._object_name,
+                                            EventType.ERROR,
+                                            info=v_warning,
+                                            severity=severe))
                 pass
         self.voltage_warning = v_warning
 
@@ -564,11 +571,11 @@ class AMP_ActiChamp(ModuleBase):
         voltage_info = "%.2fV" % voltages.VDC  # battery voltage
         for u in faultyVoltages:
             voltage_info += "\n%s" % u
-        # ToDo: self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info=voltage_info,
-        #                             severity=severe,
-        #                             status_field="Battery"))
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info=voltage_info,
+                                    severity=severe,
+                                    status_field="Battery"))
         return state < 2, voltages.VDC
 
     def process_stop(self):
@@ -606,9 +613,9 @@ class AMP_ActiChamp(ModuleBase):
         self.online_cfg.updateUI(-1)
 
     def process_output(self):
-        ''' Get data from amplifier
+        """ Get data from amplifier
         and return the eeg data block
-        '''
+        """
         t = time.process_time()
         self.eeg_data.performance_timer = 0
         self.eeg_data.performance_timer_max = 0
@@ -648,10 +655,10 @@ class AMP_ActiChamp(ModuleBase):
                 raise ModuleError(self._object_name, "connection to hardware is broken!")
             # check data rate mismatch messages
             if disconnected == CHAMP_ERR_MONITORING:
-                # ToDo: self.send_event(ModuleEvent(self._object_name,
-                #                             EventType.ERROR,
-                #                             info="USB data rate mismatch",
-                #                             severity=ErrorSeverity.NOTIFY))
+                self.send_event(ModuleEvent(self._object_name,
+                                            EventType.ERROR,
+                                            info="USB data rate mismatch",
+                                            severity=ErrorSeverity.NOTIFY))
                 pass
             return None
         else:
@@ -797,8 +804,8 @@ class AMP_ActiChamp(ModuleBase):
         try:
             self.amp.readConfiguration(self.sample_rate['base'])
         except Exception as e:
-            # self.send_exception(e)
-            pass
+            self.send_exception(e)
+
         # indicate amplifier simulation
         if self.amp.getEmulationMode() > 0:
             self.online_cfg.groupBoxMode.setTitle("Amplifier SIMULATION")
@@ -808,11 +815,10 @@ class AMP_ActiChamp(ModuleBase):
         # create channel selection maps
         if AMP_MONTAGE:
             # self._create_channel_selection()
-            # self.send_event(ModuleEvent(self._object_name,
-            #                             EventType.STATUS,
-            #                             info="%d ch" % (len(self.channel_indices)),
-            #                             status_field="Channels"))
-            pass
+            self.send_event(ModuleEvent(self._object_name,
+                                        EventType.STATUS,
+                                        info="%d ch" % (len(self.channel_indices)),
+                                        status_field="Channels"))
         else:
             self._create_all_channel_selection()
             # try:
@@ -821,10 +827,10 @@ class AMP_ActiChamp(ModuleBase):
             #     self.send_exception(e)
 
         # send current status as event
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info="%.0f Hz" % self.eeg_data.sample_rate,
-        #                             status_field="Rate"))
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info="%.0f Hz" % self.eeg_data.sample_rate,
+                                    status_field="Rate"))
         return copy.copy(self.eeg_data)
 
     def getXML(self):

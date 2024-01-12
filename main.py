@@ -135,6 +135,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get events from module chain top module
         self.topmodule.signal_event.connect(self.processEvent)
+
         # tell the top module to get events from us
         self.signal_parentevent.connect(self.topmodule.parent_event, Qt.ConnectionType.QueuedConnection)
 
@@ -487,7 +488,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     def saveLogFile(self):
         ''' Write log entries to file
         '''
-        global file_name
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.FileMode.AnyFile)
         dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
@@ -542,12 +542,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-        # recording mode changed?
-        if event.type == EventType.STATUS:
-            if event.status_field == "Mode":
-                self.recording_mode = event.info
-                self.updateUI(isRunning=(event.info >= 0))
-                # self.updateModuleInfo()
 
         # recording mode changed?
         if event.type == EventType.STATUS:
@@ -555,6 +549,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 self.recording_mode = event.info
                 self.updateUI(isRunning=(event.info >= 0))
                 self.updateModuleInfo()
+
+        # log events and update status line
+        self.statusWidget.updateEventStatus(event)
 
         # look for errors
         if (event.type == EventType.ERROR) and (event.severity > 1):
@@ -644,8 +641,8 @@ NeoRec amplifier search window
 
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
+
     signal_hide = pyqtSignal()
-    signal_on = pyqtSignal()
     signal_stop_search = pyqtSignal(bool)
 
     def __init__(self, parent=None):
@@ -696,9 +693,9 @@ MAIN CONFIGURATION DIALOG
 
 
 class DlgConfiguration(QDialog, frmMainConfiguration.Ui_frmConfiguration):
-    ''' Module main configuration dialog
+    """ Module main configuration dialog
     All module configuration panes will go here
-    '''
+    """
 
     def __init__(self):
         super().__init__()
@@ -865,6 +862,14 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :param event: ModuleEvent object
         :return:
         """
+
+        # display dedicated status info values
+        if event.type == EventType.STATUS:
+            if event.status_field == "Rate":
+                self.labelStatus_1.setText(event.info)
+            elif event.status_field == "Workspace":
+                self.labelStatus_3.setText(event.info)
+            return
 
         # put events into log fifo
         if event.type != EventType.MESSAGE:
