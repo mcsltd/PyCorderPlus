@@ -1,11 +1,11 @@
 import re
-import sys
-import os
+import threading
 
-from lxml import objectify, etree
-
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
-from PyQt6.QtCore import QDir
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
+    QVBoxLayout, QLabel
+from PyQt6.QtGui import QPixmap, QFont, QScreen
+from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
 """
 Import GUI resources.
@@ -14,13 +14,15 @@ Import GUI resources.
 from res import frmMain
 from res import frmMainConfiguration
 from res import frmDialogSelectAmp
+from res import frmDlgNeoRecConnection
 
 """
 Import and instantiate recording modules.
 """
 from modbase import *
 
-from amplifier import AMP_ActiChamp, Receiver
+from amp_actichamp.amplifier_actichamp import AMP_ActiChamp
+from amp_neorec.amplifier_neorec import AMP_NeoRec
 from montage import MNT_Recording
 from display import DISP_Scope
 from impedance import IMP_Display
@@ -29,7 +31,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 
-def InstantiateModules():
+def InstantiateModules(name_amp):
     """
     Instantiate and arrange module objects.
     Modules will be connected top -> down, starting with array index 0.
@@ -37,16 +39,42 @@ def InstantiateModules():
     @return: list with instantiated module objects
     """
     # test modules for control amplifier
-    modules = [
-        AMP_ActiChamp(),
-        MNT_Recording(),
-        TRG_Eeg(),
-        StorageVision(),
-        FLT_Eeg(),
-        IMP_Display(),
-        DISP_Scope(instance=0),
-        # Receiver()
-    ]
+    # modules = [
+    #     # AMP_ActiChamp(),
+    #     AMP_NeoRec(),
+    #     # MNT_Recording(),
+    #     # TRG_Eeg(),
+    #     # StorageVision(),
+    #     # FLT_Eeg(),
+    #     # IMP_Display(),
+    #     DISP_Scope(instance=0),
+    #     # Receiver()
+    # ]
+    modules = []
+
+    if name_amp == AMP_ActiChamp.__name__:
+        modules = [
+            AMP_ActiChamp(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
+    elif name_amp == AMP_NeoRec.__name__:
+        modules = [
+            AMP_NeoRec(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
+            DISP_Scope(instance=0),
+            # Receiver()
+        ]
+
     return modules
 
 
@@ -55,9 +83,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     Application Main Window Class
     includes main menu, status bar and module handling
     """
+    signal_parentevent = pyqtSignal("PyQt_PyObject")
+
+    RESTART = 1
 
     def __init__(self):
-
         super().__init__()
         self.setupUi(self)
 
@@ -69,6 +99,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+
+        # buttons action to select amplifier type
+        self.actionActiCHamp_Plus.triggered.connect(self._restart)
+        self.actionNeoRec.triggered.connect(self._restart)
 
         # preferences
         self.application_name = "PyCorderPlus"
@@ -90,8 +124,33 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get the top module
         self.topmodule = self.modules[0]
 
+        # get events from module chain top module
+        self.topmodule.signal_event.connect(self.processEvent)
+        # tell the top module to get events from us
+        self.signal_parentevent.connect(self.topmodule.parent_event, Qt.ConnectionType.QueuedConnection)
+
         # get the bottom module
         self.bottommodule = self.modules[-1]
+
+        # get name class Amplifier, if current topmodule is NeoRec than begin search device
+        if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
+            self.stop_search = False
+            self.actionNeoRec.setDisabled(True)
+
+            # show a window while searching for an amplifier
+            self.dlgConn = DlgConnectionNeoRec(self)
+            self.dlgConn.signal_hide.connect(self.dlgConn._hide)
+            self.dlgConn.signal_stop_search.connect(self.change_stop_search)
+
+            # activate search NeoRec
+            self.neorec_search()
+
+            # self.topmodule.disconnect_signal.connect(self.neorec_search)
+            # # actions to find a NeoRec amplifier
+            # self.signal_search.connect(self.neorec_search)
+
+        elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
+            self.actionActiCHamp_Plus.setDisabled(True)
 
         # get signal panes for plot area
         self.horizontalLayout_SignalPane.removeItem(self.horizontalLayout_SignalPane.itemAt(0))
@@ -121,13 +180,88 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             else:
                 self.defaultConfiguration()
         except:
-            pass
+            self.defaultConfiguration()
 
         # update log text module info
         # self.updateModuleInfo()
 
         # update button states
         self.updateUI()
+
+    def change_stop_search(self, flag):
+        self.stop_search = flag
+
+    def neorec_search(self):
+        """
+        Launching the NeoRec amplifier search window on the network
+        :return:
+        """
+        # show window search amplifier NeoRec
+        self.dlgConn.show()
+
+        # start searching for an amplifier
+        conn = threading.Thread(target=self._search)
+        conn.start()
+        # conn.join()
+        pass
+
+    def _reconnect(self):
+        """
+        :return:
+        """
+        # show window search amplifier NeoRec
+        self.dlgConn.show()
+
+        # start searching for an amplifier
+        conn = threading.Thread(target=self._search)
+        conn.start()
+        pass
+
+    def _search(self):
+        """
+        Activation of the NeoRec amplifier search thread
+        :return:
+        """
+        if self.check_bluetooth() == QBluetoothLocalDevice.HostMode.HostPoweredOff:
+            self.dlgConn.set_text_bluetooth_on()
+
+        # checking when the user turns on bluetooth
+        res = self.check_bluetooth()
+        while res != QBluetoothLocalDevice.HostMode.HostConnectable and not self.stop_search:
+            res = self.check_bluetooth()
+
+        if self.stop_search:
+            return
+
+        if res == QBluetoothLocalDevice.HostMode.HostConnectable:
+            self.dlgConn.set_text_bluetooth_search()
+
+        # amplifier search
+        res = self.topmodule.connection()
+
+        if res:
+            self.topmodule.set_info()
+            self.dlgConn.signal_hide.emit()
+
+    def check_bluetooth(self):
+        """
+        Checks Bluetooth status
+        :return:
+        """
+        res = QBluetoothLocalDevice().hostMode()
+        return res
+
+    def _restart(self):
+        """
+        Restart MainWindow for new type amplifier
+        :return:
+        """
+        if self.name_amplifier == AMP_NeoRec.__name__:
+            self.name_amplifier = AMP_ActiChamp.__name__
+        elif self.name_amplifier == AMP_ActiChamp.__name__:
+            self.name_amplifier = AMP_NeoRec.__name__
+        self.close()
+        QApplication.exit(self.RESTART)
 
     def updateUI(self, isRunning=False):
         """ Update user interface to reflect the recording state
@@ -364,7 +498,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-
+        print(event)
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
@@ -375,16 +509,22 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # look for errors
         if (event.type == EventType.ERROR) and (event.severity > 1):
             self.topmodule.stop(force=True)
-        pass
 
     def closeEvent(self, event):
         """
         Application wants to close, prevent closing if recording to file is still active
         """
+
         if not self.topmodule.query("Stop"):
             event.ignore()
         else:
             self.topmodule.stop(force=True)
+
+            if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
+                # Shutting down the API and disabling the BLE device
+                self.topmodule.amp.close()
+                # self.dlgConn.close()
+
             self.savePreferences()
             # clean up modules
             for module in flatten(self.modules):
@@ -393,6 +533,12 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # if self.RC != None:
             #     self.RC.terminate()
             event.accept()
+
+    def sendEvent(self, event):
+        """
+        Send an event to the top module event chain
+        """
+        self.signal_parentevent.emit(event)
 
     def configurationClicked(self):
         """ Configuration button clicked
@@ -414,7 +560,57 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         - Modules will be connected top -> down, starting with array index 0
         - Additional modules can be connected left -> right with tuples as list objects
         """
-        self.modules = InstantiateModules()
+        self.modules = InstantiateModules(self.name_amplifier)
+
+
+"""
+NeoRec amplifier search window
+"""
+
+
+class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
+    signal_hide = pyqtSignal()
+    signal_on = pyqtSignal()
+    signal_stop_search = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setupUi(self)
+        self.setWindowTitle("Connection to NeoRec")
+
+        self.label.setPixmap(QPixmap("res/press_button.png"))
+
+        # self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
+        # set text by default in label
+        self.set_text_bluetooth_search()
+        self.label_2.setFont(QFont("Ms Shell Dlg 2", 8))
+
+        self.setFixedSize(self.size())
+        # screen_size = QApplication.screen()[1].availableSize()
+        # screen_size = parent.size()
+        # x = (screen_size.width() - parent.width()) // 2
+        # y = (screen_size.height() - parent.height()) // 2
+        # self.move(x, y)
+
+    def set_text_bluetooth_on(self):
+        self.label_2.setText("Please turn on Bluetooth...")
+
+    def set_text_bluetooth_search(self):
+        self.label_2.setText("The Bluetooth network is searching for a NeoRec amplifier...")
+
+    def _hide(self):
+        self.hide()
+
+    def closeEvent(self, event):
+        result = QMessageBox.question(self, "Window close confirmation",
+                                      "Are you sure you want to close the window and stop searching for NeoRec devices?",
+                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                      QMessageBox.StandardButton.No)
+        if result == QMessageBox.StandardButton.Yes:
+            self.signal_stop_search.emit(True)
+            self.close()
+        else:
+            event.ignore()
 
 
 '''
@@ -463,12 +659,12 @@ Utilities.
 
 
 def cmpver(a, b, n=3):
-    ''' Compare two version numbers
+    """ Compare two version numbers
     @param a: version number 1
     @param b: version number 2
     @param n: number of categories to compare
     @return:  -1 if a<b, 0 if a=b, 1 if a>b
-    '''
+    """
 
     def fixup(i):
         try:
@@ -495,8 +691,6 @@ def flatten(lst):
 """
 Amplifier type selection window.
 """
-
-from PyQt6.QtCore import QCoreApplication
 
 
 class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
@@ -545,22 +739,15 @@ def main(args):
     Create and start up main application
     """
 
-    # configuration_dir, \
-    #     configuration_file, \
-    #     name_amplifier, log_dir = load_preferences()
-    #
-    # app = QApplication(sys.argv)
-    # dlg = DlgAmpTypeSelection()
-    # dlg.show()
-    # app.exec()
-    # del app
-    #
-    # name_amplifier = dlg.name_amp
+    res = MainWindow.RESTART
+    while res == MainWindow.RESTART:
+        app = QApplication(sys.argv)
+        win = MainWindow()
+        win.showMaximized()
+        res = app.exec()
 
-    app = QApplication(sys.argv)
-    win = MainWindow()
-    win.showMaximized()
-    app.exec()
+        del app
+        del win
 
 
 if __name__ == "__main__":

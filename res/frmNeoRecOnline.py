@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file '.\res\frmActiChampOnline.ui'
+# Form implementation generated from reading ui file '.\res\frmNeoRecOnline.ui'
 #
 # Created by: PyQt6 UI code generator 6.6.0
 #
@@ -10,15 +10,15 @@ from importlib.resources import path
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 
-class Ui_frmActiChampOnline(object):
-    def setupUi(self, frmActiChampOnline):
-        frmActiChampOnline.setObjectName("frmActiChampOnline")
-        frmActiChampOnline.resize(427, 233)
-        frmActiChampOnline.setFrameShape(QtWidgets.QFrame.Shape.Panel)
-        frmActiChampOnline.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.gridLayout_3 = QtWidgets.QGridLayout(frmActiChampOnline)
+class Ui_frmNeoRecOnline(object):
+    def setupUi(self, frmNeoRecOnline):
+        frmNeoRecOnline.setObjectName("frmNeoRecOnline")
+        frmNeoRecOnline.resize(427, 233)
+        frmNeoRecOnline.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        frmNeoRecOnline.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.gridLayout_3 = QtWidgets.QGridLayout(frmNeoRecOnline)
         self.gridLayout_3.setObjectName("gridLayout_3")
-        self.groupBoxMode = QtWidgets.QGroupBox(parent=frmActiChampOnline)
+        self.groupBoxMode = QtWidgets.QGroupBox(parent=frmNeoRecOnline)
         self.groupBoxMode.setFlat(False)
         self.groupBoxMode.setCheckable(False)
         self.groupBoxMode.setObjectName("groupBoxMode")
@@ -43,15 +43,6 @@ class Ui_frmActiChampOnline(object):
         self.pushButtonStartDefault.setAutoDefault(False)
         self.pushButtonStartDefault.setObjectName("pushButtonStartDefault")
         self.horizontalLayout.addWidget(self.pushButtonStartDefault)
-        self.pushButtonStartShielding = QtWidgets.QPushButton(parent=self.groupBoxMode)
-        self.pushButtonStartShielding.setMinimumSize(QtCore.QSize(100, 40))
-        self.pushButtonStartShielding.setStyleSheet("text-align: left; padding-left: 10px;")
-        self.pushButtonStartShielding.setIcon(icon)
-        self.pushButtonStartShielding.setIconSize(QtCore.QSize(32, 32))
-        self.pushButtonStartShielding.setCheckable(True)
-        self.pushButtonStartShielding.setAutoExclusive(True)
-        self.pushButtonStartShielding.setObjectName("pushButtonStartShielding")
-        self.horizontalLayout.addWidget(self.pushButtonStartShielding)
         self.gridLayout.addLayout(self.horizontalLayout, 0, 0, 1, 1)
         self.pushButtonStop = QtWidgets.QPushButton(parent=self.groupBoxMode)
         self.pushButtonStop.setMinimumSize(QtCore.QSize(100, 40))
@@ -77,35 +68,21 @@ class Ui_frmActiChampOnline(object):
         self.pushButtonStartImpedance.setAutoDefault(False)
         self.pushButtonStartImpedance.setObjectName("pushButtonStartImpedance")
         self.horizontalLayout_2.addWidget(self.pushButtonStartImpedance)
-        self.pushButtonStartTest = QtWidgets.QPushButton(parent=self.groupBoxMode)
-        self.pushButtonStartTest.setMinimumSize(QtCore.QSize(100, 40))
-        self.pushButtonStartTest.setIcon(icon)
-        self.pushButtonStartTest.setIconSize(QtCore.QSize(32, 32))
-        self.pushButtonStartTest.setCheckable(True)
-        self.pushButtonStartTest.setChecked(False)
-        self.pushButtonStartTest.setAutoExclusive(True)
-        self.pushButtonStartTest.setObjectName("pushButtonStartTest")
-        self.horizontalLayout_2.addWidget(self.pushButtonStartTest)
         self.gridLayout.addLayout(self.horizontalLayout_2, 1, 0, 1, 1)
         self.gridLayout_2.addLayout(self.gridLayout, 1, 0, 1, 1)
         self.gridLayout_3.addWidget(self.groupBoxMode, 0, 0, 1, 1)
 
-        self.retranslateUi(frmActiChampOnline)
-        QtCore.QMetaObject.connectSlotsByName(frmActiChampOnline)
+        self.retranslateUi(frmNeoRecOnline)
+        QtCore.QMetaObject.connectSlotsByName(frmNeoRecOnline)
 
-    def retranslateUi(self, frmActiChampOnline):
+    def retranslateUi(self, frmNeoRecOnline):
         _translate = QtCore.QCoreApplication.translate
-        frmActiChampOnline.setWindowTitle(_translate("frmActiChampOnline", "Frame"))
-        self.groupBoxMode.setTitle(_translate("frmActiChampOnline", "actiCHamp Plus"))
-        self.pushButtonStartDefault.setText(_translate("frmActiChampOnline", "Default\n"
+        frmNeoRecOnline.setWindowTitle(_translate("frmNeoRecOnline", "Frame"))
+        self.groupBoxMode.setTitle(_translate("frmNeoRecOnline", "NeoRec"))
+        self.pushButtonStartDefault.setText(_translate("frmNeoRecOnline", "Default\n"
 "Mode"))
-        self.pushButtonStartShielding.setText(_translate("frmActiChampOnline", "Shielding\n"
-"Mode"))
-        self.pushButtonStop.setText(_translate("frmActiChampOnline", "Stop"))
-        self.pushButtonStartImpedance.setStyleSheet(_translate("frmActiChampOnline", "text-align: left; padding-left: 10px;"))
-        self.pushButtonStartImpedance.setText(_translate("frmActiChampOnline", "Impedance\n"
-"Mode"))
-        self.pushButtonStartTest.setStyleSheet(_translate("frmActiChampOnline", "text-align: left; padding-left: 10px;"))
-        self.pushButtonStartTest.setText(_translate("frmActiChampOnline", "Test\n"
+        self.pushButtonStop.setText(_translate("frmNeoRecOnline", "Stop"))
+        self.pushButtonStartImpedance.setStyleSheet(_translate("frmNeoRecOnline", "text-align: left; padding-left: 10px;"))
+        self.pushButtonStartImpedance.setText(_translate("frmNeoRecOnline", "Impedance\n"
 "Mode"))
 

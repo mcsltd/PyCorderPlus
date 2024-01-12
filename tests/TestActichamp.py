@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 import time
-from actichamp_w import ActiChamp
+from amp_actichamp.actichamp_w import ActiChamp
 
 
 class TestActiChamp(unittest.TestCase):

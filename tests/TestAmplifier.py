@@ -1,6 +1,6 @@
 import unittest
 
-from amplifier import *
+from amp_actichamp.amplifier_actichamp import *
 
 
 class TestAmplifier(unittest.TestCase):

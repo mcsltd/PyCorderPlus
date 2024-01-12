@@ -119,7 +119,7 @@ CHAMP_RATE_500HZ = 14  # 500 Hz
 CHAMP_RATE_200HZ = 15  # 200 Hz
 
 # sample rate frequency dictionary (amplifier DLL base frequencies available for the application)
-# if you want to do the decimation and filtering in Python (amplifier.py) then
+# if you want to do the decimation and filtering in Python (amplifier_neorec.py) then
 # set this value to True:
 PythonDecimation = False
 if PythonDecimation:
@@ -466,11 +466,11 @@ class ActiChamp:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll"
+                path = r"amp_actichamp/ActiChamp_x64.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
                 self.lib.champOpen.restype = ctypes.c_uint64
             else:
-                path = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll"
+                path = r"amp_actichamp/ActiChamp_x86.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
         except:
             self.lib = None
@@ -648,10 +648,10 @@ class ActiChamp:
         try:
             ini = configparser.ConfigParser()
             if self.x64:
-                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x64.dll.ini"
+                filename = r"amp_actichamp/ActiChamp_x64.dll.ini"
                 # filename = "ActiChamp_x64.dll.ini"
             else:
-                filename = r"C:\Users\andmo\OneDrive\Desktop\my-dev-work\PyCorderPlus\ActiChamp_x86.dll.ini"
+                filename = r"amp_actichamp/ActiChamp_x86.dll.ini"
                 # filename = "ActiChamp_x86.dll.ini"
 
             if len(ini.read(filename)) > 0:
@@ -919,9 +919,9 @@ class ActiChamp:
         return self.enablePllConfiguration and (self.ampversion.revision() >= 3)
 
     def getBatteryVoltage(self):
-        ''' Read the amplifier battery voltages
+        """ Read the amplifier battery voltages
         @return: state (0=ok, 1=critical, 2=bad) and voltage
-        '''
+        """
         faultyVoltages = []
         voltages = CHAMP_VOLTAGES()
         # voltages.VDC = 0.0
@@ -1058,9 +1058,9 @@ class ActiChamp:
         # write new settings to INI file
         ini = configparser.ConfigParser()
         if self.x64:
-            filename = "ActiChamp_x64.dll.ini"
+            filename = "amp_actichamp/ActiChamp_x64.dll.ini"
         else:
-            filename = "ActiChamp_x86.dll.ini"
+            filename = "amp_actichamp/ActiChamp_x86.dll.ini"
 
         if len(ini.read(filename)) > 0:
             if modules > 0:
@@ -1090,37 +1090,6 @@ class ActiChamp:
             self.close()
         except:
             pass
-
-    def readImpedances(self):
-        ''' Get the electrode impedance values
-        @return: list of impedance values for all EEG channels plus ground electrode in Ohm.
-        '''
-        if not self.running or (self.devicehandle == 0):
-            return None, None
-
-        disconnected = None
-        # read impedance data from device
-        err = self.lib.champImpedanceGetData(self.devicehandle,
-                                             ctypes.byref(self.impbuffer),
-                                             len(self.impbuffer))
-
-        # dummy read data from device
-        err2 = self.lib.champGetData(self.devicehandle,
-                                     ctypes.byref(self.buffer),
-                                     len(self.buffer))
-
-        if err2 == CHAMP_ERR_MONITORING:
-            disconnected = CHAMP_ERR_MONITORING
-
-        if err == CHAMP_ERR_FAIL:
-            return None, None
-
-        if err != CHAMP_ERR_OK:
-            raise AmpError("failed to read impedance values", err)
-
-        # channel order in buffer is CH1,CH2..CHn, GND
-        items = self.properties.CountEeg + 1
-        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
 
     def readImpedances(self):
         """

@@ -52,7 +52,8 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
     """
     EEG signal display widget.
     """
-
+    signal_event = pyqtSignal("PyQt_PyObject")
+    signal_parentevent = pyqtSignal("PyQt_PyObject")
     def __init__(self, *args, **keys):
         ModuleBase.__init__(self, usethread=True, name="Display", **keys)  # use transmit / receive thread
         Qwt.QwtPlot.__init__(self, *args)
@@ -316,11 +317,11 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             sampletime = 1000.0 * totaltime / self.eeg.sample_channel.shape[1]
             utilization = sampletime * self.eeg.sample_rate / 1e6 * 100.0
             if self._instance == 0:
-                # self.send_event(ModuleEvent(self._object_name,
-                #                             EventType.STATUS,
-                #                             info = utilization,
-                #                             status_field = "Utilization"))
-                pass
+
+                self.send_event(ModuleEvent(self._object_name,
+                                            EventType.STATUS,
+                                            info=utilization,
+                                            status_field="Utilization"))
         return None
 
     def arrangeTraces(self):
