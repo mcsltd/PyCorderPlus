@@ -99,12 +99,15 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # menu actions
         self.actionQuit.triggered.connect(self.close)
+        self.actionShow_Log.triggered.connect(self.statusWidget.showLogEntries)
         self.actionLoad_Configuration.triggered.connect(self.loadConfiguration)
         self.actionSave_Configuration.triggered.connect(self.saveConfiguration)
         self.actionDefault_Configuration.triggered.connect(self.defaultConfiguration)
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+        self.statusWidget.signal_showLog.connect(self.showLogEntries)
+        self.statusWidget.signal_saveLog.connect(self.saveLogFile)
 
         # buttons action to select amplifier type
         self.actionActiCHamp_Plus.triggered.connect(self._restart)
@@ -189,7 +192,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.defaultConfiguration()
 
         # update log text module info
-        # self.updateModuleInfo()
+        self.updateModuleInfo()
 
         # update button states
         self.updateUI()
@@ -473,6 +476,41 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             dlg.exec()
             # set amplifier type
             self.name_amplifier = dlg.name_amp
+
+    def showLogEntries(self):
+        """
+        Show log entries
+        """
+        self.updateModuleInfo()
+        self.statusWidget.showLogEntries()
+
+    def saveLogFile(self):
+        ''' Write log entries to file
+        '''
+        global file_name
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dlg.setNameFilter("Log files (*.log)")
+        dlg.setDefaultSuffix("log")
+        if len(self.log_dir) > 0:
+            dlg.setDirectory(self.log_dir)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.log_dir = dir
+                # write log entries to file
+                f = open(file_name, "w")
+                f.write(self.statusWidget.getLogText())
+                f.close()
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                QMessageBox.critical(None, "PyCorder",
+                                     "Failed to write log file (%s)\n" % file_name +
+                                     tb + " -> " + str(e))
 
     def savePreferences(self):
         """
@@ -777,6 +815,9 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
     Main window status bar
     """
 
+    signal_showLog = pyqtSignal()
+    signal_saveLog = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -805,7 +846,10 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         Reset utilization parameters
         :return:
         """
-        pass
+        self.utilizationFifo = collections.deque()
+        self.utilizationUpdateCounter = 0
+        self.utilizationMaxValue = 0
+        self.updateUtilization(0)
 
     def updateUtilization(self, utilization):
         """
@@ -829,16 +873,23 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
     def showLogEntries(self):
         """
         Show the event log content
-        :return:
         """
-        pass
+        dlg = DlgLogView()
+        dlg.setLogEntry(self.getLogText())
+        save = dlg.exec()
+        if save:
+            self.signal_saveLog.emit()
+        self.resetErrorState()
 
     def getLogText(self):
         """
         Get the log entries as plain text
-        :return:
         """
-        pass
+        txt = u"PyCorderPlus V" + __version__ + u" Event Log\n\n"
+        txt += self.moduleinfo
+        for event in reversed(self.logFifo):
+            txt += u"%s\t %s\n" % (event.event_time.strftime("%Y-%m-%d %H:%M:%S.%f"), str(event))
+        return txt
 
     def labelInfoClicked(self, mouse_event):
         """
@@ -847,13 +898,18 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :param mouse_event:
         :return:
         """
+        self.signal_showLog.emit()
 
     def resetErrorState(self):
         """
         Reset error lock and info display
         :return:
         """
-        pass
+        self.lockError = False
+        self.labelInfo.setText("")
+        palette = self.labelInfo.palette()
+        palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
+        self.labelInfo.setPalette(palette)
 
 
 """
