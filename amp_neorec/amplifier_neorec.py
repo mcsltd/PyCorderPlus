@@ -408,7 +408,7 @@ class AMP_NeoRec(ModuleBase):
                 self.acquisitionTimeoutCounter = 0
                 self.amp.connected = False
                 # add search device NeoRec signal
-                raise
+                # raise
 
             return None
         else:

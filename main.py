@@ -498,7 +498,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-        # print(event)
+        print(event)
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":

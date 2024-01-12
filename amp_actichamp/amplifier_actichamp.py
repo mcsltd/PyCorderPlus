@@ -376,6 +376,7 @@ class AMP_ActiChamp(ModuleBase):
         ModuleBase.stop(self)
         return True
 
+
     def process_event(self, event):
         """
         Handle events from attached receivers
