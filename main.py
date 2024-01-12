@@ -1,5 +1,4 @@
 import re
-import threading
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
     QVBoxLayout, QLabel
@@ -15,6 +14,7 @@ from res import frmMain
 from res import frmMainConfiguration
 from res import frmDialogSelectAmp
 from res import frmDlgNeoRecConnection
+from res import frmMainStatusBar
 
 """
 Import and instantiate recording modules.
@@ -728,6 +728,74 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
 
         if res == QMessageBox.StandardButton.Yes:
             self.close()
+
+
+"""
+Status Bar
+"""
+
+
+class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
+    """
+    Main window status bar
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        pass
+
+    def resetUtilization(self):
+        """
+        Reset utilization parameters
+        :return:
+        """
+        pass
+
+    def updateUtilization(self, utilization):
+        """
+        Update the utilization progressbar
+        :param utilization: percentage of utilization
+        :return:
+        """
+        pass
+
+    def updateEventStatus(self, event):
+        """
+        Update status info field and put events into the log fifo
+        :param event: ModuleEvent object
+        :return:
+        """
+        pass
+
+    def showLogEntries(self):
+        """
+        Show the event log content
+        :return:
+        """
+        pass
+
+    def getLogText(self):
+        """
+        Get the log entries as plain text
+        :return:
+        """
+        pass
+
+    def labelInfoClicked(self, mouse_event):
+        """
+        Mouse click into info label
+        Show the event log content
+        :param mouse_event:
+        :return:
+        """
+
+    def resetErrorState(self):
+        """
+        Reset error lock and info display
+        :return:
+        """
+        pass
 
 
 NAME_APPLICATION = "PyCorderPlus"
