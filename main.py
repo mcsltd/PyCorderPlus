@@ -1,3 +1,4 @@
+import collections
 import re
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
@@ -15,6 +16,7 @@ from res import frmMainConfiguration
 from res import frmDialogSelectAmp
 from res import frmDlgNeoRecConnection
 from res import frmMainStatusBar
+from res import frmLogView
 
 """
 Import and instantiate recording modules.
@@ -90,6 +92,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+
+        # create status bar
+        self.statusWidget = StatusBarWidget()
+        self.statusBar().addPermanentWidget(self.statusWidget, 1)
 
         # menu actions
         self.actionQuit.triggered.connect(self.close)
@@ -498,13 +504,19 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-        print(event)
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
                 self.recording_mode = event.info
                 self.updateUI(isRunning=(event.info >= 0))
                 # self.updateModuleInfo()
+
+        # recording mode changed?
+        if event.type == EventType.STATUS:
+            if event.status_field == "Mode":
+                self.recording_mode = event.info
+                self.updateUI(isRunning=(event.info >= 0))
+                self.updateModuleInfo()
 
         # look for errors
         if (event.type == EventType.ERROR) and (event.severity > 1):
@@ -561,6 +573,31 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         - Additional modules can be connected left -> right with tuples as list objects
         """
         self.modules = InstantiateModules(self.name_amplifier)
+
+    def updateModuleInfo(self):
+        """
+        Update the module information in the log text
+        and propagate it to all connected modules as status information
+        :return:
+        """
+        # get module information
+        self.statusWidget.moduleinfo = ""
+        for module in flatten(self.modules):
+            info = module.get_module_info()
+            if info is not None:
+                self.statusWidget.moduleinfo += module._object_name + "\n"
+                self.statusWidget.moduleinfo += info
+        if len(self.statusWidget.moduleinfo) > 0:
+            self.statusWidget.moduleinfo += "\n\n"
+
+        # propagate status info to all connected modules
+        moduleinfo = "PyCorderPlus V" + __version__ + "\n\n"
+        moduleinfo += self.statusWidget.moduleinfo
+        msg = ModuleEvent("PyCorderPlus",
+                          EventType.STATUS,
+                          info=moduleinfo,
+                          status_field="ModuleInfo")
+        self.sendEvent(msg)
 
 
 """
@@ -743,7 +780,25 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        pass
+
+        # info label color and click
+        self.labelInfo.setAutoFillBackground(True)
+        self.labelInfo.mouseReleaseEvent = self.labelInfoClicked
+        self.defaultBkColor = self.labelInfo.palette().color(self.labelInfo.backgroundRole())
+        self.labelInfo.setText("Medical Computer Systems Ltd, PyCorderPlus V" + __version__)
+        self.labelStatus_4.setAutoFillBackground(True)
+
+        # log entries
+        self.logFifo = collections.deque(maxlen=10000)
+        self.lockError = False
+        self.moduleinfo = ""
+
+        # number of channels and reference channel names
+        self.status_channels = ""
+        self.status_reference = ""
+
+        # utilization progressbar fifo
+        self.resetUtilization()
 
     def resetUtilization(self):
         """
@@ -766,7 +821,10 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :param event: ModuleEvent object
         :return:
         """
-        pass
+
+        # put events into log fifo
+        if event.type != EventType.MESSAGE:
+            self.logFifo.append(event)
 
     def showLogEntries(self):
         """
@@ -796,6 +854,24 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :return:
         """
         pass
+
+
+"""
+Log Entry Dialog
+"""
+
+
+class DlgLogView(QDialog, frmLogView.Ui_frmLogView):
+    """
+    Show all log entries as plain text
+    """
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.setupUi(self)
+
+    def setLogEntry(self, entry):
+        self.labelView.setPlainText(entry)
 
 
 NAME_APPLICATION = "PyCorderPlus"
