@@ -879,7 +879,57 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :param utilization: percentage of utilization
         :return:
         """
-        pass
+        # average utilization value
+        self.utilizationFifo.append(utilization)
+        if len(self.utilizationFifo) > 5:
+            self.utilizationFifo.popleft()
+        utilization = sum(self.utilizationFifo) / len(self.utilizationFifo)
+        self.utilizationMaxValue = max(self.utilizationMaxValue, utilization)
+
+        # slow down utilization display
+        if self.utilizationUpdateCounter > 0:
+            self.utilizationUpdateCounter -= 1
+            return
+        self.utilizationUpdateCounter = 5
+        utilization = self.utilizationMaxValue
+        self.utilizationMaxValue = 0
+
+        # update progress bar
+        if utilization < 100:
+            self.progressBarUtilization.setValue(int(utilization))
+        else:
+            self.progressBarUtilization.setValue(100)
+        self.progressBarUtilization.setFormat("%d%% Utilization" % utilization)
+
+        # modify progress bar color (<80% -> green, >=80% -> red)
+        if utilization < 80:
+            self.progressBarUtilization.setStyleSheet("""
+                QProgressBar {
+                    padding: 1px;
+                    text-align: right;
+                    margin-right: 17ex;
+                }
+
+                QProgressBar::chunk {
+                    background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 lime, stop: 0 white);
+                    margin: 0.5px;
+                }
+            """)
+            pass
+        else:
+            self.progressBarUtilization.setStyleSheet("""
+                QProgressBar {
+                    padding: 1px;
+                    text-align: right;
+                    margin-right: 17ex;
+                }
+
+                QProgressBar::chunk {
+                    background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 red, stop: 0 white);
+                    margin: 0.5px;
+                }
+            """)
+            pass
 
     def updateEventStatus(self, event):
         """
@@ -918,6 +968,8 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
                 else:
                     palette.setColor(self.labelStatus_4.backgroundRole(), self.defaultBkColor)
                 self.labelStatus_4.setPalette(palette)
+            elif event.status_field == "Utilization":
+                self.updateUtilization(event.info)
             return
 
         # put events into log fifo

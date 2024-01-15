@@ -317,7 +317,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             sampletime = 1000.0 * totaltime / self.eeg.sample_channel.shape[1]
             utilization = sampletime * self.eeg.sample_rate / 1e6 * 100.0
             if self._instance == 0:
-
                 self.send_event(ModuleEvent(self._object_name,
                                             EventType.STATUS,
                                             info=utilization,
