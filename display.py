@@ -841,13 +841,12 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         """ Get info about current selected channel group
         """
         # ToDo: rewrite
-        # if not (ChannelGroup.EEG in self.group_slices):
-        #     return False
-        # channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex()).toPyObject()
-        # if channel_slice in self.group_slices[ChannelGroup.EEG]:
-        #     return True
-        # return False
-        pass
+        if not (ChannelGroup.EEG in self.group_slices):
+            return False
+        channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex())
+        if channel_slice in self.group_slices[ChannelGroup.EEG]:
+            return True
+        return False
 
     def _get_cb_index(self, cb, value, isdata):
         """
