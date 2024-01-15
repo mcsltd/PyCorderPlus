@@ -317,7 +317,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             sampletime = 1000.0 * totaltime / self.eeg.sample_channel.shape[1]
             utilization = sampletime * self.eeg.sample_rate / 1e6 * 100.0
             if self._instance == 0:
-
                 self.send_event(ModuleEvent(self._object_name,
                                             EventType.STATUS,
                                             info=utilization,
@@ -554,20 +553,24 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             self.selectedChannel = None
         else:
             self.selectedChannel = plotitem.title().text()
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.COMMAND,
-        #                             info="ChannelSelected",
-        #                             cmd_value=plotitem.title().text()))
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info="ChannelSelected",
+                cmd_value=plotitem.title().text()
+            )
+        )
 
     def getXML(self):
-        ''' Get module properties for XML configuration file
+        """ Get module properties for XML configuration file
         @return: objectify XML element::
             e.g.
             <DISP_Scope instance="0" version="1">
                 <timebase>1000</timebase>
                 ...
             </DISP_Scope>
-        '''
+        """
         eeg_scale, aux_scale = self.online_cfg.get_groupscale()
         E = objectify.E
         cfg = E.DISP_Scope(E.timebase(self.online_cfg.get_timebase()),
@@ -837,13 +840,12 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         """ Get info about current selected channel group
         """
         # ToDo: rewrite
-        # if not (ChannelGroup.EEG in self.group_slices):
-        #     return False
-        # channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex()).toPyObject()
-        # if channel_slice in self.group_slices[ChannelGroup.EEG]:
-        #     return True
-        # return False
-        pass
+        if not (ChannelGroup.EEG in self.group_slices):
+            return False
+        channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex())
+        if channel_slice in self.group_slices[ChannelGroup.EEG]:
+            return True
+        return False
 
     def _get_cb_index(self, cb, value, isdata):
         """

@@ -502,11 +502,9 @@ class ModuleBase(QObject):
         self._receivers.append(receiver)
 
         # get events from receiver
-        # self.connect(receiver, Qt.SIGNAL("event(PyQt_PyObject)"), self.receiver_event, Qt.Qt.QueuedConnection)
         receiver.signal_event.connect(self.receiver_event, Qt.ConnectionType.QueuedConnection)
 
         # tell the receiver to get events from parent
-        # receiver.connect(self, Qt.SIGNAL("parentevent(PyQt_PyObject)"), receiver.parent_event, Qt.Qt.QueuedConnection)
         self.signal_parentevent.connect(receiver.parent_event, Qt.ConnectionType.QueuedConnection)
 
 
@@ -531,7 +529,6 @@ class ModuleBase(QObject):
         # let derived class objects handle the event
         self.process_event(event)
         # propagate event to receivers
-        # self.emit(Qt.SIGNAL('parentevent(PyQt_PyObject)'), event)
         self.signal_parentevent.emit(event)
 
     def receiver_event(self, event):
@@ -543,7 +540,6 @@ class ModuleBase(QObject):
         self.process_event(event)
         # propagate event to parent
         # self.send_event(event)
-        # self.emit(Qt.SIGNAL('event(PyQt_PyObject)'), event)
         self.signal_event.emit(event)
 
     def send_event(self, event):
@@ -551,8 +547,7 @@ class ModuleBase(QObject):
         Don't override this method.
         @param event: ModuleEvent object
         '''
-        # self.emit(Qt.SIGNAL('parentevent(PyQt_PyObject)'), event)
-        print(event)
+        self.signal_event.emit(event)
         self.signal_parentevent.emit(event)
         pass
 

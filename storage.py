@@ -171,13 +171,13 @@ class StorageVision(ModuleBase):
             # print("samples missing = %i, interval = %i, cumulated = %i"%(missing_samples, self.missing_interval, self.missing_cumulated))
             error = "%d samples missing" % missing_samples
             if self.missing_interval > 2:
-                # self.send_event(
-                #     ModuleEvent(self._object_name, EventType.ERROR, info=error, severity=ErrorSeverity.NOTIFY)
-                # )
+                self.send_event(
+                    ModuleEvent(self._object_name, EventType.ERROR, info=error, severity=ErrorSeverity.NOTIFY)
+                )
                 self.missing_interval = 0
                 self.missing_cumulated = 0
-            # else:
-            #     # self.send_event(ModuleEvent(self._object_name, EventType.LOG, info=error))
+            else:
+                self.send_event(ModuleEvent(self._object_name, EventType.LOG, info=error))
             self.missing_timer = time.process_time()
         else:
             missing_samples = 0
@@ -211,10 +211,10 @@ class StorageVision(ModuleBase):
                 self._thLock.release()  # release the thread lock because it is acquired by _close_recording()
                 self._close_recording()  # stop recording
                 self._thLock.acquire()
-                # ToDo: notify application
-                # self.send_event(ModuleEvent(self._object_name, EventType.ERROR,
-                #                             str(e),
-                #                             severity=ErrorSeverity.NOTIFY))
+                # notify application
+                self.send_event(ModuleEvent(self._object_name, EventType.ERROR,
+                                            str(e),
+                                            severity=ErrorSeverity.NOTIFY))
 
         # update the global sample counter missing value
         self.total_missing += missing_samples
@@ -562,10 +562,10 @@ class StorageVision(ModuleBase):
             self.online_cfg.set_recording_state(True)
 
             # send status to application
-            # self.send_event(ModuleEvent(self._object_name,
-            #                             EventType.STATUS,
-            #                             info=self.file_name,
-            #                             status_field="Storage"))
+            self.send_event(ModuleEvent(self._object_name,
+                                        EventType.STATUS,
+                                        info=self.file_name,
+                                        status_field="Storage"))
         return True
 
     def _get_unique_filename(self, filename):
@@ -791,8 +791,7 @@ class StorageVision(ModuleBase):
         # check version, has to be lower or equal than current version
         version = cfg.get("version")
         if (version is None) or (int(version) > self.xmlVersion):
-            # self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
-            pass
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR, "XML Configuration: wrong version"))
             return
         version = int(version)
 
@@ -808,7 +807,7 @@ class StorageVision(ModuleBase):
                 self.min_disk_space = 1.0
 
         except Exception as e:
-            # self.send_exception(e, severity=ErrorSeverity.NOTIFY)
+            self.send_exception(e, severity=ErrorSeverity.NOTIFY)
             pass
 
     def check_free_space(self, freespace):
@@ -823,10 +822,10 @@ class StorageVision(ModuleBase):
             # stop recording
             self.write_error = True
             self._close_recording()
-            # ToDo: notify application
-            # self.send_event(ModuleEvent(self._object_name, EventType.ERROR,
-            #                             "out of disk space (<%.2fGB), recording stopped"%(self.min_disk_space),
-            #                             severity=ErrorSeverity.NOTIFY))
+            # notify application
+            self.send_event(ModuleEvent(self._object_name, EventType.ERROR,
+                                        "out of disk space (<%.2fGB), recording stopped" % self.min_disk_space,
+                                        severity=ErrorSeverity.NOTIFY))
         return False
 
 

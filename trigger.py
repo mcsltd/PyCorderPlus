@@ -160,11 +160,11 @@ class TRG_Eeg(ModuleBase):
         for nz in nzidx:
             if state[nz] != button_state:
                 button_state = state[nz]
-                # self.send_event(ModuleEvent(self._object_name,
-                #                             EventType.COMMAND,
-                #                             info="MyButton",
-                #                             cmd_value="pressed" if button_state else "released"
-                #                             ))
+                self.send_event(ModuleEvent(self._object_name,
+                                            EventType.COMMAND,
+                                            info="MyButton",
+                                            cmd_value="pressed" if button_state else "released"
+                                            ))
                 # insert button marker
                 sc = self.data.sample_channel[0][idx[nz]]  # take sample counter
                 if idx[nz] == 0:

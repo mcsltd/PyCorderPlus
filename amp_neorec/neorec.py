@@ -142,7 +142,7 @@ class t_nb2BatteryProperties(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("Capacity", ctypes.c_uint16),
-        ("Level", ctypes.c_uint16),
+        ("Level", ctypes.c_uint16),  # /10 %
         ("Voltage", ctypes.c_uint16),
         ("Current", ctypes.c_int16),  # mA
         ("Temperature", ctypes.c_int16)
@@ -197,6 +197,9 @@ class AmpError(Exception):
     def __str__(self):
         return self.value
 
+class AmpVersion:
+    def __init__(self):
+        pass
 
 class NeoRec:
     def __init__(self):
@@ -214,7 +217,7 @@ class NeoRec:
         self.impbuffer = ctypes.create_string_buffer(1000)  #: impedance raw data transfer buffer
 
         # info has Model, SerialNumber, ProductionDate
-        self.info = t_nb2Information()
+        self.deviceinfo = t_nb2Information()
 
         self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
         self.BlockingMode = True  #: read data in blocking mode
@@ -300,13 +303,13 @@ class NeoRec:
                     self.connected = True
 
         # get information about open device
-        err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
+        err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.deviceinfo))
         if err != NR_ERR_OK:
             return False
         else:
             # get the NeoRec amp model and serial number
-            self.model = self.info.Model
-            self.sn = self.info.SerialNumber
+            self.model = self.deviceinfo.Model
+            self.sn = self.deviceinfo.SerialNumber
 
         # get device properties
         err = self.lib.nb2GetProperty(self.id, ctypes.byref(self.properties))
@@ -573,13 +576,37 @@ class NeoRec:
         d.append(sct)
         return d, disconnected
 
+    def getDeviceInfoString(self):
+        """
+        Return device info as string
+        """
+        info = "NeoRec"
+
+        if self.deviceinfo.Model != 0 and self.deviceinfo.SerialNumber != 0:
+            if self.deviceinfo.Model not in NR_Models:
+                raise AmpError("unidentified NeoRec amplifier model")
+            info += f" {NR_Models[self.deviceinfo.Model]} ({self.deviceinfo.Model}) SN: {self.deviceinfo.SerialNumber}"
+        else:
+            info += " n.a.\n"
+        # get firmware versions
+        # info += self.ampversion.info() + "\n"
+        # return info
+        return info
+
     def getDeviceStatus(self):
         """
         Read status values from device
-        @return: total samples, total errors, data rate and data speed as tuple
+        :return: Rate, Speed, Ratio, BLE Utilization
         """
-        # there are no functions from the dll library to implement this function
-        pass
+        if self.lib is None or self.id == 0:
+            return None
+
+        status = t_nb2DataStatus()  # Rate, Speed, Ratio, BLE Utilization
+
+        err = self.lib.nb2GetDataStatus(self.id, ctypes.byref(status))
+        if err != NR_ERR_OK:
+            raise AmpError("failed to read device status")
+        return status.Utilization, status.Rate, status.Ratio, status.Speed
 
     def readImpedances(self):
         """
@@ -623,7 +650,11 @@ class NeoRec:
         # get amplifier battery info
         err = self.lib.nb2GetBattery(self.id, ctypes.byref(battery))
         if err != NR_ERR_OK:
-            return
+            return AmpError("failed to read battery info", err)
+        level = battery.Level / 10  # in percentage, %
+        # voltage = battery.Voltage
+        # current = battery.Current
+        return level
 
         # print("Current", battery.Current)
 

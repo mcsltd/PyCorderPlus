@@ -114,8 +114,8 @@ class IMP_Display(ModuleBase):
         Send new impedance color range as ModuleEvent to update ActiCap LED color range
         """
         val = tuple([self.range_max / 3.0, self.range_max * 2.0 / 3.0])
-        # self.send_event(ModuleEvent(self._object_name, EventType.COMMAND, info="ImpColorRange",
-        #                             cmd_value=val))
+        self.send_event(ModuleEvent(self._object_name, EventType.COMMAND, info="ImpColorRange",
+                                    cmd_value=val))
 
     def process_stop(self):
         """
@@ -299,13 +299,8 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         self.checkBoxValues.setChecked(self.module.show_values)
 
         # actions
-        # self.connect(self.comboBoxRange, Qt.SIGNAL("editTextChanged(QString)"), self._rangeChanged)
         self.comboBoxRange.editTextChanged.connect(self._rangeChanged)
-
-        # self.connect(self.checkBoxValues, Qt.SIGNAL("stateChanged(int)"), self._showvalues_changed)
         self.checkBoxValues.stateChanged.connect(self._showvalues_changed)
-
-        # self.connect(self.module, Qt.SIGNAL('update(PyQt_PyObject)'), self._updateValues)
         self.module.update.connect(self._updateValues)
 
     def _rangeChanged(self, rrange):
@@ -480,8 +475,7 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         self.setParent(None)
         self.disconnect(self.module.update.connect(self._updateValues))
         if self.sender() is None:
-            # self.module.send_event(ModuleEvent(self.module._object_name, EventType.COMMAND, "Stop"))
-            pass
+            self.module.send_event(ModuleEvent(self.module._object_name, EventType.COMMAND, "Stop"))
         event.accept()
 
 

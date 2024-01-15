@@ -228,7 +228,7 @@ class AMP_NeoRec(ModuleBase):
         """
         self.sample_rate = self.sample_rates[0]  # 125Hz sample rate
         self.dynamic_range = self.dynamic_ranges[0]  # 150 mV dynamic range
-        self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]   # mode Optimal
+        self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]  # mode Optimal
 
         for channel in self.channel_config:
             channel.isReference = False
@@ -292,7 +292,6 @@ class AMP_NeoRec(ModuleBase):
     def process_update(self, params):
         """
         Prepare channel properties and propagate update to all connected receivers
-        :param params:
         :return:
         """
         # update device sampling rate and get new configuration
@@ -308,7 +307,24 @@ class AMP_NeoRec(ModuleBase):
         # create channel selection maps
         self._create_all_channel_selection()
 
+        # send current status as event
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=f"{int(self.eeg_data.sample_rate)} Hz",
+                status_field="Rate"
+            )
+        )
+
         return copy.copy(self.eeg_data)
+
+
+    def get_module_info(self):
+        """ Get information about this module for the about dialog
+        @return: Serial numbers of amplifier and modules
+        """
+        return self.amp.getDeviceInfoString()
 
     def process_start(self):
         """
@@ -321,7 +337,9 @@ class AMP_NeoRec(ModuleBase):
         self.test_counter = 0
 
         # check battery
-        self._check_battery()
+        ok, level = self._check_battery()
+        if not ok:
+            raise ModuleError(self._object_name, f"level battery low {level} %!")
 
         # setup hardware
         flag = self.amp.setup(
@@ -332,23 +350,32 @@ class AMP_NeoRec(ModuleBase):
         )
 
         # case of disconnection
-        if not flag:
-            # set connection state
-            self.amp.connected = False
-            # emit signal start search device
-            self.disconnect_signal.emit()
-            raise ModuleError(self._object_name, "disconnected")
+        # if not flag:
+        #     # set connection state
+        #     self.amp.connected = False
+        #     # emit signal start search device
+        #     self.disconnect_signal.emit()
+        #     raise ModuleError(self._object_name, "disconnected")
 
         self.update_receivers()
 
         if len(self.channel_indices) == 0:
-            raise
+            raise ModuleError(self._object_name, "no input channels selected!")
 
         # start hardware
         self.amp.start()
 
         # set start time on first call
         self.start_time = datetime.datetime.now()
+
+        # send status info in log
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.LOGMESSAGE,
+                info=f"Start {NR_Modes[self.recording_mode]} at {int(self.eeg_data.sample_rate)}Hz"
+            )
+        )
 
         # send recording mode
         self.send_event(ModuleEvent(self._object_name,
@@ -369,8 +396,33 @@ class AMP_NeoRec(ModuleBase):
         Check Amplifier NeoRec battery
         :return:
         """
-        # read battery state
-        self.amp.getBatteryInfo()
+        # read amplifier battery voltage level
+        level = self.amp.getBatteryInfo()
+        # assess battery level
+        severe = ErrorSeverity.IGNORE
+        if level < 15:
+            severe = ErrorSeverity.NOTIFY
+        elif level < 5:
+            severe = ErrorSeverity.STOP
+
+        # create and send status message
+        level_info = f"{level} %"
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=level_info,
+                severity=severe,
+                status_field="Battery"
+            )
+        )
+        return severe < ErrorSeverity.STOP, level
+
+    def _check_ble(self):
+        # read amplifier ble utilization level
+        ble = self.amp.getDeviceStatus()[0]
+        print(ble)
+        pass
 
     def process_output(self):
         """
@@ -382,8 +434,9 @@ class AMP_NeoRec(ModuleBase):
         self.eeg_data.performance_timer_max = 0
         self.recordtime = 0.0
 
-        # check battery voltage every 5s
+        # check level battery voltage and BLE utilization level every 5s
         if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
+            self._check_ble()
             self._check_battery()
             self.battery_timer = t
 
@@ -483,11 +536,24 @@ class AMP_NeoRec(ModuleBase):
         except:
             pass
 
+        # send status info in log
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.LOGMESSAGE,
+                info=f"Stop {NR_Modes[self.recording_mode]}"
+            )
+        )
+
         # send recording mode
-        self.send_event(ModuleEvent(self._object_name,
-                                    EventType.STATUS,
-                                    info=-1,  # stop
-                                    status_field="Mode"))
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=-1,  # stop
+                status_field="Mode"
+            )
+        )
 
         # update button state
         self.online_cfg.updateUI(-1)
@@ -667,7 +733,6 @@ Amplifier module configuration GUI.
 
 
 class _DeviceConfigurationPane(QFrame, frmNeoRecConfiguration.Ui_frmNeoRecConfig):
-
     rateChanged = pyqtSignal(int)
     rangeChanged = pyqtSignal(int)
     modeChanged = pyqtSignal(int)

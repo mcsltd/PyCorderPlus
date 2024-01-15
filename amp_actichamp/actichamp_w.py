@@ -38,7 +38,6 @@ import time
 import configparser
 import platform
 
-
 # max integer
 INT32_MAX = 2 ** 31 - 1
 
@@ -332,8 +331,7 @@ class AmpVersion:
         self.boardRevision = 4
 
     def read(self, lib, device):
-        """
-        read board dependent version infos from amplifier
+        """ read board dependent version infos from amplifier
         attention: the carrier board FPGA version (FPGAC) is only available if the acquisition is running.
         @param lib: DLL handle
         @param device: device handle
@@ -350,20 +348,8 @@ class AmpVersion:
             self.boardRevision = 0
         return res
 
-    def DLL(self):
-        """
-        get the DLL version
-        """
-        return self.version.DLL
-
-    def isFpgaProgrammed(self):
-        if self.boardRevision and self.version.FPGA == 0:
-            return False
-        return True
-
     def readext(self, lib, device):
-        """
-        read version info for amplifier board revision 6
+        """ read version info for amplifier board revision 6
         attention: the carrier board FPGA version (FPGAC) is only available if the acquisition is running.
         @param lib: DLL handle
         @param device: device handle
@@ -374,9 +360,98 @@ class AmpVersion:
             res = lib.champGetVersionExt(device, ctypes.byref(self.versionext))
         return res
 
-    def revision(self):
+    def isFpgaProgrammed(self):
+        if self.boardRevision and self.version.FPGA == 0:
+            return False
+        return True
+
+    def isValid(self):
+        """ Validate major firmware versions
+        @return: True if valid (or emulated), False if not
         """
-        get the amplifier revision, depending on board revision
+        if self.boardRevision == 4:
+            if self.version.USBCTRL != 0 and self.version.USBCTRL & 0xFF000000 != CHAMP_4_VERSION_CTRL & 0xFF000000:
+                return False
+            if self.version.FPGA != 0 and self.version.FPGA & 0xFF000000 != CHAMP_4_VERSION_FPGA & 0xFF000000:
+                return False
+            if self.version.DSP != 0 and self.version.DSP & 0xFF000000 != CHAMP_4_VERSION_DSP & 0xFF000000:
+                return False
+        if self.boardRevision == 6:
+            if self.versionext.USBCTRL != 0 and self.versionext.USBCTRL & 0xFF000000 != CHAMP_6_VERSION_CTRL & 0xFF000000:
+                return False
+            if self.versionext.FPGAM != 0 and self.versionext.FPGAM & 0xFF000000 != CHAMP_6_VERSION_FPGAM & 0xFF000000:
+                return False
+            if self.versionext.FPGAC != 0 and self.versionext.FPGAC & 0xFF000000 != CHAMP_6_VERSION_FPGAC & 0xFF000000:
+                return False
+            if self.versionext.DSP != 0 and self.versionext.DSP & 0xFF000000 != CHAMP_6_VERSION_DSP & 0xFF000000:
+                return False
+        return True
+
+    def _getVersionString(self, rawversion):
+        """ get readable version string from DWORD
+        @param rawversion: raw version number from DLL
+        @return: version string
+        """
+        # split version number
+        version = ""
+        for i in reversed(range(4)):
+            version += "%02i" % ((rawversion >> i * 8) & 0xFF)
+            if i:
+                version += "."
+        return version
+
+    def info(self):
+        """ get all amplifier firmware versions as string
+        """
+        if self.boardRevision == 4:
+            # create version string for board revision 4
+            version = "Version: DLL_%s, DRV_%s, CTRL_%s, FPGA_%s, DSP_%s" % (self._getVersionString(self.version.DLL),
+                                                                             self._getVersionString(
+                                                                                 self.version.USBDRV),
+                                                                             self._getVersionString(
+                                                                                 self.version.USBCTRL),
+                                                                             self._getVersionString(self.version.FPGA),
+                                                                             self._getVersionString(self.version.DSP))
+            # required firmware versions
+            req_version = "Firmware Version MISMATCH, required: CTRL_%s, FPGA_%s, DSP_%s" % (
+                self._getVersionString(CHAMP_4_VERSION_CTRL),
+                self._getVersionString(CHAMP_4_VERSION_FPGA),
+                self._getVersionString(CHAMP_4_VERSION_DSP))
+
+        elif self.boardRevision == 6:
+            # create version string for board revision 6
+            version = "Version: DLL_%s, DRV_%s, CTRL_%s, FPGAM_%s, FPGAC_%s, DSP_%s" % (
+                self._getVersionString(self.versionext.DLL),
+                self._getVersionString(self.versionext.USBDRV),
+                self._getVersionString(self.versionext.USBCTRL),
+                self._getVersionString(self.versionext.FPGAM),
+                self._getVersionString(self.versionext.FPGAC),
+                self._getVersionString(self.versionext.DSP))
+            # required firmware versions
+            req_version = "Firmware Version MISMATCH, required: CTRL_%s, FPGAM_%s, FPGAC_%s DSP_%s" % (
+                self._getVersionString(CHAMP_6_VERSION_CTRL),
+                self._getVersionString(CHAMP_6_VERSION_FPGAM),
+                self._getVersionString(CHAMP_6_VERSION_FPGAC),
+                self._getVersionString(CHAMP_6_VERSION_DSP))
+        else:
+            version = ""
+            req_version = ""
+
+        '''            
+        if self.isValid():
+            return version
+        else:
+            return version +"\n" + req_version
+        '''
+        return version
+
+    def DLL(self):
+        """ get the DLL version
+        """
+        return self.version.DLL
+
+    def revision(self):
+        """ get the amplifier revision, depending on board revision
         """
         if self.boardRevision > 4:
             return 3
@@ -894,6 +969,32 @@ class ActiChamp:
         csext.AdcFilter = CHAMP_ADC_AVERAGING_2
         return csext
 
+    def getDeviceInfoString(self):
+        """
+        Return device info as string
+        """
+        emulation = self.getEmulationMode()
+        if emulation != 0:
+            info = "actiCHamp Simulation Mode, %i Module(s)\n" % emulation
+        else:
+            info = ""
+            for n in range(0, len(self.deviceinfo)):
+                if n == 0:
+                    info += "actiCHamp "
+                else:
+                    info += "Module %i  " % (n)
+                if self.deviceinfo[n].Date.wYear == 0:
+                    info += "n.a."
+                else:
+                    info += "(%i) SN: %08i" % (self.deviceinfo[n].Model,
+                                               self.deviceinfo[n].SerialNumber)
+                    if n == 0:
+                        info += " Rev. %i" % self.ampversion.revision()
+                info += "\n"
+        # get firmware versions
+        info += self.ampversion.info() + "\n"
+        return info
+
     def setPllInput(self):
         """
         Set the PLL input either to external or internal
@@ -1004,10 +1105,10 @@ class ActiChamp:
             led_array[self.LED_index] = 2
             self.LED_index += 1
         elif step == 11:
-            led_array[:] = [1]*len(led_array)
+            led_array[:] = [1] * len(led_array)
             self.LED_index = 0
         elif step == 12:
-            led_array[:] = [2]*len(led_array)
+            led_array[:] = [2] * len(led_array)
             self.LED_index = 0
         err = self.lib.champSetElectrodes(self.devicehandle, led_array, ctypes.sizeof(led_array))
         if err != CHAMP_ERR_OK:
@@ -1123,6 +1224,59 @@ class ActiChamp:
         items = self.properties.CountEeg + 1
         return np.fromstring(self.impbuffer, np.uint32, items), disconnected
 
+    def setImpedanceRange(self, good, bad):
+        """ set ActiCap impedance range
+        @param good: impedance value for green LED in Ohm
+        @param bad: impedance value for red LED in Ohm
+        """
+        if self.devicehandle == 0:
+            return
+        imp_settings = CHAMP_IMPEDANCE_SETUP()
+        imp_settings.Good = int(good)
+        imp_settings.Bad = int(bad)
+        imp_settings.LedsDisable = 0
+        imp_settings.TimeOut = 5
+        err = self.lib.champImpedanceSetSetup(self.devicehandle, ctypes.byref(imp_settings))
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set LED impedance range", err)
+
+    def setTrigger(self, trigger):
+        """ set trigger output
+        @param trigger: trigger values to set 8-bit outputs (bits 0 - 7).
+        """
+        if self.devicehandle == 0:
+            return
+
+        # 8-bit inputs (bits 0 - 7) + 8-bit outputs (bits 8 - 15) + 16 MSB reserved bits.
+        trigger = (trigger & 0xFF) << 8
+        ct_trigger = ctypes.c_uint(trigger)
+        err = self.lib.champSetTriggers(self.devicehandle, ct_trigger)
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set trigger output", err)
+
+    def setButtonLed(self, period, dutyCycle):
+        """ Control MyButton LED via pulse-width modulation
+        @param period:  cycle period in [ms]
+        @param dutyCycle: duty cycle in [%], 0%=always off, 100%=always on
+        """
+        if self.devicehandle == 0:
+            return
+        dutyCycle = max(min(dutyCycle, 100), 0)  # limit to 0-100%
+        period = max(min(period, 10000), 1)  # limit to 1-10000ms
+
+        # use a fixed period for on/off
+        if dutyCycle == 0 or dutyCycle == 100:
+            period = 10
+
+        # convert to C variables
+        cPeriod = ctypes.c_uint(period)
+        cDutyCycle = ctypes.c_uint(dutyCycle)
+
+        # set LED
+        err = self.lib.champSetMyButtonLed(self.devicehandle, cPeriod, cDutyCycle)
+        if err != CHAMP_ERR_OK:
+            raise AmpError("failed to set MyButton LED", err)
+
 
 if __name__ == "__main__":
     obj = ActiChamp()
@@ -1150,8 +1304,3 @@ if __name__ == "__main__":
         #     print(err)
     obj.stop()
     obj.close()
-
-
-
-
-

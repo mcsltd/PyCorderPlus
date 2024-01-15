@@ -1,9 +1,9 @@
+import collections
 import re
-import threading
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
     QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap, QFont, QScreen
+from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
@@ -15,6 +15,8 @@ from res import frmMain
 from res import frmMainConfiguration
 from res import frmDialogSelectAmp
 from res import frmDlgNeoRecConnection
+from res import frmMainStatusBar
+from res import frmLogView
 
 """
 Import and instantiate recording modules.
@@ -91,14 +93,21 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
 
+        # create status bar
+        self.statusWidget = StatusBarWidget()
+        self.statusBar().addPermanentWidget(self.statusWidget, 1)
+
         # menu actions
         self.actionQuit.triggered.connect(self.close)
+        self.actionShow_Log.triggered.connect(self.statusWidget.showLogEntries)
         self.actionLoad_Configuration.triggered.connect(self.loadConfiguration)
         self.actionSave_Configuration.triggered.connect(self.saveConfiguration)
         self.actionDefault_Configuration.triggered.connect(self.defaultConfiguration)
 
         # button actions
         self.pushButtonConfiguration.clicked.connect(self.configurationClicked)
+        self.statusWidget.signal_showLog.connect(self.showLogEntries)
+        self.statusWidget.signal_saveLog.connect(self.saveLogFile)
 
         # buttons action to select amplifier type
         self.actionActiCHamp_Plus.triggered.connect(self._restart)
@@ -126,6 +135,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get events from module chain top module
         self.topmodule.signal_event.connect(self.processEvent)
+
         # tell the top module to get events from us
         self.signal_parentevent.connect(self.topmodule.parent_event, Qt.ConnectionType.QueuedConnection)
 
@@ -183,7 +193,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.defaultConfiguration()
 
         # update log text module info
-        # self.updateModuleInfo()
+        self.updateModuleInfo()
 
         # update button states
         self.updateUI()
@@ -278,7 +288,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.actionSave_Configuration.setEnabled(True)
             self.actionQuit.setEnabled(True)
             self.actionDefault_Configuration.setEnabled(True)
-            # self.statusWidget.resetUtilization()
+            self.statusWidget.resetUtilization()
 
     def defaultConfiguration(self):
         """
@@ -293,7 +303,14 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.topmodule.update_receivers()
 
         # update status line
-        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info="default", status_field="Workspace"))
+        self.processEvent(
+            ModuleEvent(
+                "Application",
+                EventType.STATUS,
+                info="default",
+                status_field="Workspace"
+            )
+        )
 
     def loadConfiguration(self):
         """ Menu "Load Configuration ...":
@@ -341,14 +358,28 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         if (len(app) == 0) or (app[0].get("version") is None):
             # configuration data not found
-            # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s is not a valid PyCorder configuration file"%(filename), severity=1))
+            self.processEvent(
+                ModuleEvent(
+                    "Load Configuration",
+                    EventType.ERROR,
+                    "%s is not a valid PyCorder configuration file" % filename,
+                    severity=1
+                )
+            )
             ok = False
 
         if ok:
             version = app[0].get("version")
             if cmpver(version, __version__, 2) > 0:
                 # wrong version
-                # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s wrong version %s > %s" % (filename, version, __version__), severity=ErrorSeverity.NOTIFY))
+                self.processEvent(
+                    ModuleEvent(
+                        "Load Configuration",
+                        EventType.ERROR,
+                        "%s wrong version %s > %s" % (filename, version, __version__),
+                        severity=ErrorSeverity.NOTIFY
+                    )
+                )
                 ok = False
 
         # setup modules from configuration file
@@ -361,7 +392,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # update status line
         file_name, ext = os.path.splitext(os.path.split(filename)[1])
-        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
+        self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
 
     def saveConfiguration(self):
         """
@@ -468,6 +499,40 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # set amplifier type
             self.name_amplifier = dlg.name_amp
 
+    def showLogEntries(self):
+        """
+        Show log entries
+        """
+        self.updateModuleInfo()
+        self.statusWidget.showLogEntries()
+
+    def saveLogFile(self):
+        ''' Write log entries to file
+        '''
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dlg.setNameFilter("Log files (*.log)")
+        dlg.setDefaultSuffix("log")
+        if len(self.log_dir) > 0:
+            dlg.setDirectory(self.log_dir)
+        if dlg.exec():
+            try:
+                files = dlg.selectedFiles()
+                file_name = files[0]
+                # set preferences
+                dir, fn = os.path.split(file_name)
+                self.log_dir = dir
+                # write log entries to file
+                f = open(file_name, "w")
+                f.write(self.statusWidget.getLogText())
+                f.close()
+            except Exception as e:
+                tb = GetExceptionTraceBack()[0]
+                QMessageBox.critical(None, "PyCorder",
+                                     "Failed to write log file (%s)\n" % file_name +
+                                     tb + " -> " + str(e))
+
     def savePreferences(self):
         """
         Save preferences to XML file
@@ -498,13 +563,20 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-        print(event)
+
+        # process commands
+        if event.type == EventType.COMMAND:
+            return
+
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
                 self.recording_mode = event.info
                 self.updateUI(isRunning=(event.info >= 0))
-                # self.updateModuleInfo()
+                self.updateModuleInfo()
+
+        # log events and update status line
+        self.statusWidget.updateEventStatus(event)
 
         # look for errors
         if (event.type == EventType.ERROR) and (event.severity > 1):
@@ -562,6 +634,31 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         """
         self.modules = InstantiateModules(self.name_amplifier)
 
+    def updateModuleInfo(self):
+        """
+        Update the module information in the log text
+        and propagate it to all connected modules as status information
+        :return:
+        """
+        # get module information
+        self.statusWidget.moduleinfo = ""
+        for module in flatten(self.modules):
+            info = module.get_module_info()
+            if info is not None:
+                self.statusWidget.moduleinfo += module._object_name + "\n"
+                self.statusWidget.moduleinfo += info
+        if len(self.statusWidget.moduleinfo) > 0:
+            self.statusWidget.moduleinfo += "\n\n"
+
+        # propagate status info to all connected modules
+        moduleinfo = "PyCorderPlus V" + __version__ + "\n\n"
+        moduleinfo += self.statusWidget.moduleinfo
+        msg = ModuleEvent("PyCorderPlus",
+                          EventType.STATUS,
+                          info=moduleinfo,
+                          status_field="ModuleInfo")
+        self.sendEvent(msg)
+
 
 """
 NeoRec amplifier search window
@@ -569,8 +666,8 @@ NeoRec amplifier search window
 
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
+
     signal_hide = pyqtSignal()
-    signal_on = pyqtSignal()
     signal_stop_search = pyqtSignal(bool)
 
     def __init__(self, parent=None):
@@ -621,9 +718,9 @@ MAIN CONFIGURATION DIALOG
 
 
 class DlgConfiguration(QDialog, frmMainConfiguration.Ui_frmConfiguration):
-    ''' Module main configuration dialog
+    """ Module main configuration dialog
     All module configuration panes will go here
-    '''
+    """
 
     def __init__(self):
         super().__init__()
@@ -728,6 +825,230 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
 
         if res == QMessageBox.StandardButton.Yes:
             self.close()
+
+
+"""
+Status Bar
+"""
+
+
+class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
+    """
+    Main window status bar
+    """
+
+    signal_showLog = pyqtSignal()
+    signal_saveLog = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+        # info label color and click
+        self.labelInfo.setAutoFillBackground(True)
+        self.labelInfo.mouseReleaseEvent = self.labelInfoClicked
+        self.defaultBkColor = self.labelInfo.palette().color(self.labelInfo.backgroundRole())
+        self.labelInfo.setText("Medical Computer Systems Ltd, PyCorderPlus V" + __version__)
+        self.labelStatus_4.setAutoFillBackground(True)
+
+        # log entries
+        self.logFifo = collections.deque(maxlen=10000)
+        self.lockError = False
+        self.moduleinfo = ""
+
+        # number of channels and reference channel names
+        self.status_channels = ""
+        self.status_reference = ""
+
+        # utilization progressbar fifo
+        self.resetUtilization()
+
+    def resetUtilization(self):
+        """
+        Reset utilization parameters
+        :return:
+        """
+        self.utilizationFifo = collections.deque()
+        self.utilizationUpdateCounter = 0
+        self.utilizationMaxValue = 0
+        self.updateUtilization(0)
+
+    def updateUtilization(self, utilization):
+        """
+        Update the utilization progressbar
+        :param utilization: percentage of utilization
+        :return:
+        """
+        # average utilization value
+        self.utilizationFifo.append(utilization)
+        if len(self.utilizationFifo) > 5:
+            self.utilizationFifo.popleft()
+        utilization = sum(self.utilizationFifo) / len(self.utilizationFifo)
+        self.utilizationMaxValue = max(self.utilizationMaxValue, utilization)
+
+        # slow down utilization display
+        if self.utilizationUpdateCounter > 0:
+            self.utilizationUpdateCounter -= 1
+            return
+        self.utilizationUpdateCounter = 5
+        utilization = self.utilizationMaxValue
+        self.utilizationMaxValue = 0
+
+        # update progress bar
+        if utilization < 100:
+            self.progressBarUtilization.setValue(int(utilization))
+        else:
+            self.progressBarUtilization.setValue(100)
+        self.progressBarUtilization.setFormat("%d%% Utilization" % utilization)
+
+        # modify progress bar color (<80% -> green, >=80% -> red)
+        if utilization < 80:
+            self.progressBarUtilization.setStyleSheet("""
+                QProgressBar {
+                    padding: 1px;
+                    text-align: right;
+                    margin-right: 17ex;
+                }
+
+                QProgressBar::chunk {
+                    background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 lime, stop: 0 white);
+                    margin: 0.5px;
+                }
+            """)
+            pass
+        else:
+            self.progressBarUtilization.setStyleSheet("""
+                QProgressBar {
+                    padding: 1px;
+                    text-align: right;
+                    margin-right: 17ex;
+                }
+
+                QProgressBar::chunk {
+                    background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 red, stop: 0 white);
+                    margin: 0.5px;
+                }
+            """)
+            pass
+
+    def updateEventStatus(self, event):
+        """
+        Update status info field and put events into the log fifo
+        :param event: ModuleEvent object
+        :return:
+        """
+        # display dedicated status info values
+        if event.type == EventType.STATUS:
+            if event.status_field == "Rate":
+                self.labelStatus_1.setText(event.info)
+            elif event.status_field == "Channels":
+                self.status_channels = event.info
+                self.labelStatus_2.setText(self.status_channels + ", " + self.status_reference)
+            elif event.status_field == "Reference":
+                refnames = event.info
+                # limit the number of displayed channel names
+                if len(refnames) > 70:
+                    refnames = refnames[:70].rsplit('+', 1)[0] + "+ ..."
+                self.status_reference = refnames
+                self.labelStatus_2.setText(self.status_channels + ", " + self.status_reference)
+            elif event.status_field == "Workspace":
+                self.labelStatus_3.setText(event.info)
+            elif event.status_field == "Battery":
+                # set voltage
+                self.labelStatus_4.setText(event.info)
+                # severity indicates normal, critical or bad
+                palette = self.labelStatus_4.palette()
+                if event.severity == ErrorSeverity.NOTIFY:
+                    palette.setColor(self.labelStatus_4.backgroundRole(),
+                                     Qt.GlobalColor.yellow)
+                elif event.severity == ErrorSeverity.STOP:
+                    palette.setColor(self.labelStatus_4.backgroundRole(),
+                                     Qt.GlobalColor.red)
+                else:
+                    palette.setColor(self.labelStatus_4.backgroundRole(), self.defaultBkColor)
+                self.labelStatus_4.setPalette(palette)
+            elif event.status_field == "Utilization":
+                self.updateUtilization(event.info)
+            return
+
+        # lock an error display until LogView is shown
+        if ((not self.lockError) or (event.severity > 0)) and event.type != EventType.LOG:
+            # update label
+            self.labelInfo.setText(event.info)
+            palette = self.labelInfo.palette()
+            if event.type == EventType.ERROR:
+                palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.red)
+                if event.severity > 0:
+                    self.lockError = True
+                    palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.red)
+                else:
+                    palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.yellow)
+            else:
+                palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
+            self.labelInfo.setPalette(palette)
+
+        # put events into log fifo
+        if event.type != EventType.MESSAGE:
+            self.logFifo.append(event)
+
+    def showLogEntries(self):
+        """
+        Show the event log content
+        """
+        dlg = DlgLogView()
+        dlg.setLogEntry(self.getLogText())
+        save = dlg.exec()
+        if save:
+            self.signal_saveLog.emit()
+        self.resetErrorState()
+
+    def getLogText(self):
+        """
+        Get the log entries as plain text
+        """
+        txt = u"PyCorderPlus V" + __version__ + u" Event Log\n\n"
+        txt += self.moduleinfo
+        for event in reversed(self.logFifo):
+            txt += u"%s\t %s\n" % (event.event_time.strftime("%Y-%m-%d %H:%M:%S.%f"), str(event))
+        return txt
+
+    def labelInfoClicked(self, mouse_event):
+        """
+        Mouse click into info label
+        Show the event log content
+        :param mouse_event:
+        :return:
+        """
+        self.signal_showLog.emit()
+
+    def resetErrorState(self):
+        """
+        Reset error lock and info display
+        :return:
+        """
+        self.lockError = False
+        self.labelInfo.setText("")
+        palette = self.labelInfo.palette()
+        palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
+        self.labelInfo.setPalette(palette)
+
+
+"""
+Log Entry Dialog
+"""
+
+
+class DlgLogView(QDialog, frmLogView.Ui_frmLogView):
+    """
+    Show all log entries as plain text
+    """
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.setupUi(self)
+
+    def setLogEntry(self, entry):
+        self.labelView.setPlainText(entry)
 
 
 NAME_APPLICATION = "PyCorderPlus"
