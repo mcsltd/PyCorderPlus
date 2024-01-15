@@ -142,7 +142,7 @@ class t_nb2BatteryProperties(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("Capacity", ctypes.c_uint16),
-        ("Level", ctypes.c_uint16),
+        ("Level", ctypes.c_uint16),  # /10 %
         ("Voltage", ctypes.c_uint16),
         ("Current", ctypes.c_int16),  # mA
         ("Temperature", ctypes.c_int16)
@@ -576,10 +576,17 @@ class NeoRec:
     def getDeviceStatus(self):
         """
         Read status values from device
-        @return: total samples, total errors, data rate and data speed as tuple
+        :return: Rate, Speed, Ratio, BLE Utilization
         """
-        # there are no functions from the dll library to implement this function
-        pass
+        if self.lib is None or self.id == 0:
+            return None
+
+        status = t_nb2DataStatus()  # Rate, Speed, Ratio, BLE Utilization
+
+        err = self.lib.nb2GetDataStatus(self.id, ctypes.byref(status))
+        if err != NR_ERR_OK:
+            raise AmpError("failed to read device status")
+        return status.Utilization, status.Rate, status.Ratio, status.Speed
 
     def readImpedances(self):
         """
@@ -623,7 +630,11 @@ class NeoRec:
         # get amplifier battery info
         err = self.lib.nb2GetBattery(self.id, ctypes.byref(battery))
         if err != NR_ERR_OK:
-            return
+            return AmpError("failed to read battery info", err)
+        level = battery.Level / 10  # in percentage, %
+        # voltage = battery.Voltage
+        # current = battery.Current
+        return level
 
         # print("Current", battery.Current)
 
