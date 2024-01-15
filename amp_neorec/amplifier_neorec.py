@@ -292,7 +292,6 @@ class AMP_NeoRec(ModuleBase):
     def process_update(self, params):
         """
         Prepare channel properties and propagate update to all connected receivers
-        :param params:
         :return:
         """
         # update device sampling rate and get new configuration
@@ -307,6 +306,16 @@ class AMP_NeoRec(ModuleBase):
 
         # create channel selection maps
         self._create_all_channel_selection()
+
+        # send current status as event
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=f"{self.eeg_data.sample_rate} Hz",
+                status_field="Rate"
+            )
+        )
 
         return copy.copy(self.eeg_data)
 
@@ -332,12 +341,12 @@ class AMP_NeoRec(ModuleBase):
         )
 
         # case of disconnection
-        if not flag:
-            # set connection state
-            self.amp.connected = False
-            # emit signal start search device
-            self.disconnect_signal.emit()
-            raise ModuleError(self._object_name, "disconnected")
+        # if not flag:
+        #     # set connection state
+        #     self.amp.connected = False
+        #     # emit signal start search device
+        #     self.disconnect_signal.emit()
+        #     raise ModuleError(self._object_name, "disconnected")
 
         self.update_receivers()
 
@@ -349,6 +358,15 @@ class AMP_NeoRec(ModuleBase):
 
         # set start time on first call
         self.start_time = datetime.datetime.now()
+
+        # send status info in log
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.LOGMESSAGE,
+                info=f"Start {NR_Modes[self.recording_mode]} at {int(self.eeg_data.sample_rate)}Hz"
+            )
+        )
 
         # send recording mode
         self.send_event(ModuleEvent(self._object_name,
@@ -483,11 +501,24 @@ class AMP_NeoRec(ModuleBase):
         except:
             pass
 
+        # send status info in log
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.LOGMESSAGE,
+                info=f"Stop {NR_Modes[self.recording_mode]}"
+            )
+        )
+
         # send recording mode
-        self.send_event(ModuleEvent(self._object_name,
-                                    EventType.STATUS,
-                                    info=-1,  # stop
-                                    status_field="Mode"))
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=-1,  # stop
+                status_field="Mode"
+            )
+        )
 
         # update button state
         self.online_cfg.updateUI(-1)
