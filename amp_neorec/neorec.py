@@ -197,6 +197,9 @@ class AmpError(Exception):
     def __str__(self):
         return self.value
 
+class AmpVersion:
+    def __init__(self):
+        pass
 
 class NeoRec:
     def __init__(self):
@@ -214,7 +217,7 @@ class NeoRec:
         self.impbuffer = ctypes.create_string_buffer(1000)  #: impedance raw data transfer buffer
 
         # info has Model, SerialNumber, ProductionDate
-        self.info = t_nb2Information()
+        self.deviceinfo = t_nb2Information()
 
         self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
         self.BlockingMode = True  #: read data in blocking mode
@@ -300,13 +303,13 @@ class NeoRec:
                     self.connected = True
 
         # get information about open device
-        err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.info))
+        err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.deviceinfo))
         if err != NR_ERR_OK:
             return False
         else:
             # get the NeoRec amp model and serial number
-            self.model = self.info.Model
-            self.sn = self.info.SerialNumber
+            self.model = self.deviceinfo.Model
+            self.sn = self.deviceinfo.SerialNumber
 
         # get device properties
         err = self.lib.nb2GetProperty(self.id, ctypes.byref(self.properties))
@@ -572,6 +575,23 @@ class NeoRec:
         d.append(eeg)
         d.append(sct)
         return d, disconnected
+
+    def getDeviceInfoString(self):
+        """
+        Return device info as string
+        """
+        info = "NeoRec"
+
+        if self.deviceinfo.Model != 0 and self.deviceinfo.SerialNumber != 0:
+            if self.deviceinfo.Model not in NR_Models:
+                raise AmpError("unidentified NeoRec amplifier model")
+            info += f" {NR_Models[self.deviceinfo.Model]} ({self.deviceinfo.Model}) SN: {self.deviceinfo.SerialNumber}"
+        else:
+            info += " n.a.\n"
+        # get firmware versions
+        # info += self.ampversion.info() + "\n"
+        # return info
+        return info
 
     def getDeviceStatus(self):
         """

@@ -319,6 +319,13 @@ class AMP_NeoRec(ModuleBase):
 
         return copy.copy(self.eeg_data)
 
+
+    def get_module_info(self):
+        """ Get information about this module for the about dialog
+        @return: Serial numbers of amplifier and modules
+        """
+        return self.amp.getDeviceInfoString()
+
     def process_start(self):
         """
         Open amplifier hardware and start data acquisition

@@ -300,7 +300,6 @@ class AMP_ActiChamp(ModuleBase):
         ModuleBase.stop(self)
         return True
 
-
     def process_event(self, event):
         """
         Handle events from attached receivers
@@ -393,7 +392,7 @@ class AMP_ActiChamp(ModuleBase):
             return
         # else keep the first reference channel only
         eeg_ref = np.array(list(map(lambda x: x.isReference, self.channel_config)))
-        ref_index = np.nonzero(eeg_ref)[0]     # indices of reference channel(s)
+        ref_index = np.nonzero(eeg_ref)[0]  # indices of reference channel(s)
         for ch in self.channel_config[ref_index[1:]]:
             ch.isReference = False
 
