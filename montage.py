@@ -194,32 +194,40 @@ class MNT_Recording(ModuleBase):
             params.eeg_channels = params.eeg_channels[self.output_channel_indices]
 
         # send number of enabled channels for status display
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info="%d ch" % (len(self.output_channel_indices)),
-        #                             status_field="Channels"))
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info="%d ch" % (len(self.output_channel_indices)),
+                                    status_field="Channels"))
 
         # send reference channel names for status display
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.STATUS,
-        #                             info="REF: %s" % (params.ref_channel_name),
-        #                             status_field="Reference"))
+        self.send_event(ModuleEvent(self._object_name,
+                                    EventType.STATUS,
+                                    info="REF: %s" % params.ref_channel_name,
+                                    status_field="Reference"))
 
         # check for duplicate labels and show warning
         if not self._validateChannelLabels():
             self.hasDuplicateLabels = True
-            # self.send_event(ModuleEvent(self._object_name,
-            #                             EventType.ERROR,
-            #                             info="Pycorder detected duplicate channel names, please check the recording montage," +
-            #                                  "otherwise this may cause problems in your analysis software",
-            #                             severity=ErrorSeverity.IGNORE))
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.ERROR,
+                    info="Pycorder detected duplicate channel names, please check the recording montage,"
+                         "otherwise this may cause problems in your analysis software",
+                    severity=ErrorSeverity.IGNORE
+                )
+            )
         else:
             # remove the previous warning message from status line
             if self.hasDuplicateLabels:
                 self.hasDuplicateLabels = False
-                # self.send_event(ModuleEvent("",
-                #                             EventType.MESSAGE,
-                #                             info=""))
+                self.send_event(
+                    ModuleEvent(
+                        "",
+                        EventType.MESSAGE,
+                        info=""
+                    )
+                )
 
         return params
 

@@ -303,7 +303,14 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.topmodule.update_receivers()
 
         # update status line
-        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info="default", status_field="Workspace"))
+        self.processEvent(
+            ModuleEvent(
+                "Application",
+                EventType.STATUS,
+                info="default",
+                status_field="Workspace"
+            )
+        )
 
     def loadConfiguration(self):
         """ Menu "Load Configuration ...":
@@ -351,14 +358,28 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         if (len(app) == 0) or (app[0].get("version") is None):
             # configuration data not found
-            # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s is not a valid PyCorder configuration file"%(filename), severity=1))
+            self.processEvent(
+                ModuleEvent(
+                    "Load Configuration",
+                    EventType.ERROR,
+                    "%s is not a valid PyCorder configuration file" % filename,
+                    severity=1
+                )
+            )
             ok = False
 
         if ok:
             version = app[0].get("version")
             if cmpver(version, __version__, 2) > 0:
                 # wrong version
-                # self.processEvent(ModuleEvent("Load Configuration", EventType.ERROR, "%s wrong version %s > %s" % (filename, version, __version__), severity=ErrorSeverity.NOTIFY))
+                self.processEvent(
+                    ModuleEvent(
+                        "Load Configuration",
+                        EventType.ERROR,
+                        "%s wrong version %s > %s" % (filename, version, __version__),
+                        severity=ErrorSeverity.NOTIFY
+                    )
+                )
                 ok = False
 
         # setup modules from configuration file
@@ -371,7 +392,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # update status line
         file_name, ext = os.path.splitext(os.path.split(filename)[1])
-        # self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
+        self.processEvent(ModuleEvent("Application", EventType.STATUS, info=file_name, status_field="Workspace"))
 
     def saveConfiguration(self):
         """
@@ -867,8 +888,32 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         if event.type == EventType.STATUS:
             if event.status_field == "Rate":
                 self.labelStatus_1.setText(event.info)
+            elif event.status_field == "Channels":
+                self.status_channels = event.info
+                self.labelStatus_2.setText(self.status_channels + ", " + self.status_reference)
+            elif event.status_field == "Reference":
+                refnames = event.info
+                # limit the number of displayed channel names
+                if len(refnames) > 70:
+                    refnames = refnames[:70].rsplit('+', 1)[0] + "+ ..."
+                self.status_reference = refnames
+                self.labelStatus_2.setText(self.status_channels + ", " + self.status_reference)
             elif event.status_field == "Workspace":
                 self.labelStatus_3.setText(event.info)
+            elif event.status_field == "Battery":
+                # set voltage
+                self.labelStatus_4.setText(event.info)
+                # severity indicates normal, critical or bad
+                palette = self.labelStatus_4.palette()
+                if event.severity == ErrorSeverity.NOTIFY:
+                    palette.setColor(self.labelStatus_4.backgroundRole(),
+                                     Qt.GlobalColor.yellow)
+                elif event.severity == ErrorSeverity.STOP:
+                    palette.setColor(self.labelStatus_4.backgroundRole(),
+                                     Qt.GlobalColor.red)
+                else:
+                    palette.setColor(self.labelStatus_4.backgroundRole(), self.defaultBkColor)
+                self.labelStatus_4.setPalette(palette)
             return
 
         # put events into log fifo

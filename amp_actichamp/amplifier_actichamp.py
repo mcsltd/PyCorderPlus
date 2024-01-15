@@ -165,21 +165,24 @@ class AMP_ActiChamp(ModuleBase):
         return config
 
     def _samplerate_changed(self, index):
-        ''' SIGNAL from configuration pane if sample rate has changed
-        '''
+        """
+        SIGNAL from configuration pane if sample rate has changed
+        """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         self.sample_rate = self.sample_rates[index]
         self.update_receivers()
         QApplication.restoreOverrideCursor()
 
     def _configuration_changed(self):
-        ''' SIGNAL from configuration pane if values has changed
-        '''
+        """
+        SIGNAL from configuration pane if values has changed
+        """
         self.update_receivers()
 
     def _emulation_changed(self, index):
-        ''' SIGNAL from configuration pane if emulation mode has changed
-        '''
+        """
+        SIGNAL from configuration pane if emulation mode has changed
+        """
         try:
             self.amp.setEmulationMode(index)
         except Exception as e:
@@ -187,7 +190,8 @@ class AMP_ActiChamp(ModuleBase):
         self.update_receivers()
 
     def _online_mode_changed(self, new_mode):
-        """ SIGNAL from online configuration pane if recording mode has changed
+        """
+        SIGNAL from online configuration pane if recording mode has changed
         """
         if self.amp.running:
             if not self.stop():
@@ -200,89 +204,9 @@ class AMP_ActiChamp(ModuleBase):
             self.start()
             QApplication.restoreOverrideCursor()
 
-    # def _create_channel_selection(self):
-    #     ''' Create index arrays of selected channels and prepare EEG_DataBlock
-    #     '''
-    #     # get all active eeg channel indices (including reference channel)
-    #     mask = lambda x: (x.group == ChannelGroup.EEG) and (x.enable | x.isReference) and (
-    #             x.input <= self.amp.properties.CountEeg)
-    #     eeg_map = np.array(list(map(mask, self.channel_config)))
-    #     self.eeg_indices = np.nonzero(eeg_map)[0]  # indices of all eeg channels
-    #
-    #     # get all active aux channel indices
-    #     mask = lambda x: (x.group == ChannelGroup.AUX) and x.enable and (x.input <= self.amp.properties.CountAux)
-    #     eeg_map = np.array(list(map(mask, self.channel_config)))
-    #     self.aux_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
-    #     self.property_indices = np.append(self.eeg_indices, self.aux_indices)
-    #
-    #     # adjust AUX indices to the actual available EEG channels
-    #     self.aux_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg)
-    #     self.channel_indices = np.append(self.eeg_indices, self.aux_indices)
-    #
-    #     # create a new data block based on channel selection
-    #     self.eeg_data = EEG_DataBlock(len(self.eeg_indices), len(self.aux_indices))
-    #     self.eeg_data.channel_properties = copy.deepcopy(self.channel_config[self.property_indices])
-    #     self.eeg_data.sample_rate = self.sample_rate['value']
-    #
-    #     # get the reference channel indices
-    #     # mask = lambda x: (x.group == ChannelGroup.EEG) and x.isReference and (x.input <= self.amp.properties.CountEeg)
-    #     # ToDo: check type map(...)
-    #     eeg_ref = np.array(map(lambda x: x.isReference, self.eeg_data.channel_properties))
-    #     self.ref_index = np.nonzero(eeg_ref)[0]  # indices of reference channel(s)
-    #     if len(self.ref_index) and not AMP_MULTIPLE_REF:
-    #         # use only the first reference channel
-    #         self.ref_index = self.ref_index[0:1]
-    #         idx = np.nonzero(map(lambda x: x not in self.ref_index,
-    #                              range(0, len(self.eeg_indices))
-    #                              )
-    #                          )[0]
-    #         for prop in self.eeg_data.channel_properties[idx]:
-    #             prop.isReference = False
-    #
-    #     # append "REF" to the reference channel name and create the combined reference channel name
-    #     refnames = []
-    #     for prop in self.eeg_data.channel_properties[self.ref_index]:
-    #         refnames.append(str(prop.name))
-    #         prop.name = "REF_" + prop.name
-    #         prop.refname = "REF"
-    #         # global hide for all reference channels?
-    #         if AMP_HIDE_REF:
-    #             prop.enable = False
-    #     if len(refnames) > 1:
-    #         self.eeg_data.ref_channel_name = "AVG(" + "+".join(refnames) + ")"
-    #     else:
-    #         self.eeg_data.ref_channel_name = "".join(refnames)
-    #
-    #     # remove reference channel if not in impedance mode
-    #     self.ref_remove_index = self.ref_index
-    #     if (self.recording_mode != CHAMP_MODE_IMPEDANCE) and len(self.ref_index):
-    #         # set reference channel names for all other electrodes
-    #         idx = np.nonzero(map(lambda x: x not in self.ref_index,
-    #                              range(0, len(self.eeg_indices))
-    #                              )
-    #                          )[0]
-    #         for prop in self.eeg_data.channel_properties[idx]:
-    #             prop.refname = "REF"
-    #
-    #         '''
-    #         # remove single reference channel
-    #         if AMP_HIDE_REF or not self.eeg_data.channel_properties[self.ref_index[0]].enable:
-    #             self.eeg_data.channel_properties = np.delete(self.eeg_data.channel_properties, self.ref_index, 0)
-    #             self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_index, 0)
-    #         '''
-    #         # remove all disabled reference channels
-    #         ref_dis = np.array(map(lambda x: x.isReference and not x.enable,
-    #                                self.eeg_data.channel_properties))
-    #         self.ref_remove_index = np.nonzero(ref_dis)[0]  # indices of disabled reference channels
-    #         self.eeg_data.channel_properties = np.delete(self.eeg_data.channel_properties, self.ref_remove_index, 0)
-    #         self.eeg_data.eeg_channels = np.delete(self.eeg_data.eeg_channels, self.ref_remove_index, 0)
-    #
-    #     # prepare recording mode and anti aliasing filters
-    #     # self._prepare_mode_and_filters()
-
     def _create_all_channel_selection(self):
-        ''' Create index arrays of all available channels and prepare EEG_DataBlock
-        '''
+        """ Create index arrays of all available channels and prepare EEG_DataBlock
+        """
         # get all eeg channel indices
         mask = lambda x: (x.group == ChannelGroup.EEG) and (x.input <= self.amp.properties.CountEeg)
         eeg_map = np.array(list(map(mask, self.channel_config)))
@@ -950,8 +874,8 @@ class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
         self.pushButtonStop.clicked.connect(self._button_toggle)
 
     def _button_toggle(self, checked):
-        ''' SIGNAL if one of the push buttons is clicked
-        '''
+        """ SIGNAL if one of the push buttons is clicked
+        """
         if checked:
             mode = -1  # stop
             if self.pushButtonStartDefault.isChecked():
