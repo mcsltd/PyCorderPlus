@@ -3,7 +3,7 @@ import re
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
     QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap, QFont, QScreen
+from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
@@ -971,6 +971,22 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
             elif event.status_field == "Utilization":
                 self.updateUtilization(event.info)
             return
+
+        # lock an error display until LogView is shown
+        if ((not self.lockError) or (event.severity > 0)) and event.type != EventType.LOG:
+            # update label
+            self.labelInfo.setText(event.info)
+            palette = self.labelInfo.palette()
+            if event.type == EventType.ERROR:
+                palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.red)
+                if event.severity > 0:
+                    self.lockError = True
+                    palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.red)
+                else:
+                    palette.setColor(self.labelInfo.backgroundRole(), Qt.GlobalColor.yellow)
+            else:
+                palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
+            self.labelInfo.setPalette(palette)
 
         # put events into log fifo
         if event.type != EventType.MESSAGE:
