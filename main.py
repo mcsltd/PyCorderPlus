@@ -564,6 +564,10 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         Stop acquisition on errors with a severity > 1
         """
 
+        # process commands
+        if event.type == EventType.COMMAND:
+            return
+
         # recording mode changed?
         if event.type == EventType.STATUS:
             if event.status_field == "Mode":
