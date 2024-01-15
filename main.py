@@ -288,7 +288,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.actionSave_Configuration.setEnabled(True)
             self.actionQuit.setEnabled(True)
             self.actionDefault_Configuration.setEnabled(True)
-            # self.statusWidget.resetUtilization()
+            self.statusWidget.resetUtilization()
 
     def defaultConfiguration(self):
         """
