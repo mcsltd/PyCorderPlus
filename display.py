@@ -554,20 +554,24 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             self.selectedChannel = None
         else:
             self.selectedChannel = plotitem.title().text()
-        # self.send_event(ModuleEvent(self._object_name,
-        #                             EventType.COMMAND,
-        #                             info="ChannelSelected",
-        #                             cmd_value=plotitem.title().text()))
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info="ChannelSelected",
+                cmd_value=plotitem.title().text()
+            )
+        )
 
     def getXML(self):
-        ''' Get module properties for XML configuration file
+        """ Get module properties for XML configuration file
         @return: objectify XML element::
             e.g.
             <DISP_Scope instance="0" version="1">
                 <timebase>1000</timebase>
                 ...
             </DISP_Scope>
-        '''
+        """
         eeg_scale, aux_scale = self.online_cfg.get_groupscale()
         E = objectify.E
         cfg = E.DISP_Scope(E.timebase(self.online_cfg.get_timebase()),
