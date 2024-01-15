@@ -937,7 +937,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         :param event: ModuleEvent object
         :return:
         """
-
         # display dedicated status info values
         if event.type == EventType.STATUS:
             if event.status_field == "Rate":

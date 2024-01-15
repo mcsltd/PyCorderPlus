@@ -312,7 +312,7 @@ class AMP_NeoRec(ModuleBase):
             ModuleEvent(
                 self._object_name,
                 EventType.STATUS,
-                info=f"{self.eeg_data.sample_rate} Hz",
+                info=f"{int(self.eeg_data.sample_rate)} Hz",
                 status_field="Rate"
             )
         )
