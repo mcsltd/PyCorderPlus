@@ -61,6 +61,14 @@ NR_DITHERING_MINIMUM = 1
 NR_DITHERING_OFF = 3
 
 
+class t_nb2Version(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('Dll', ctypes.c_uint64),
+        ('Firmware', ctypes.c_uint64)
+    ]
+
+
 class t_nb2Date(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
@@ -197,9 +205,27 @@ class AmpError(Exception):
     def __str__(self):
         return self.value
 
+
 class AmpVersion:
     def __init__(self):
+        self.version = t_nb2Version()
         pass
+
+    def read(self, lib, idx):
+        """
+        Get information about Firmware and DLL
+        :param lib: DLL handle
+        :param idx: Connected device ID
+        :return: result of receiving data
+        """
+        res = lib.nb2GetVersion(idx, ctypes.byref(self.version))
+        return res
+
+    def DLL(self):
+        """ get the DLL version
+        """
+        return self.version.Dll
+
 
 class NeoRec:
     def __init__(self):
@@ -218,6 +244,9 @@ class NeoRec:
 
         # info has Model, SerialNumber, ProductionDate
         self.deviceinfo = t_nb2Information()
+
+        # info about DLL, firmware
+        self.ampversion = AmpVersion()
 
         self.sampleCounterAdjust = 0  #: sample counter wrap around, HW counter is 32bit value but we need 64bit
         self.BlockingMode = True  #: read data in blocking mode
@@ -277,8 +306,8 @@ class NeoRec:
         # initialization library resources
         res = self.lib.nb2ApiInit()
         if res != NR_ERR_OK:
-            # AmpError("can't initialize library resources")
-            pass
+            AmpError("can't initialize library resources")
+
 
     def open(self):
         """
@@ -288,43 +317,55 @@ class NeoRec:
         if self.running:
             return
         if self.lib is None:
-            # raise AmpError("library nb2mcs_x64.dll not available")
-            return
+            raise AmpError("library nb2mcs_x64.dll not available")
 
-        while not self.connected:
-            # get the number of devices on the network
-            c = self.lib.nb2GetCount()
-            if c > 0:
-                # get index device with number 1
-                self.id = self.lib.nb2GetId(0)
-                # open this device
-                err = self.lib.nb2Open(self.id)
-                if err == NR_ERR_OK:
-                    self.connected = True
+        # get the number of devices on the network
+        cnt = self.lib.nb2GetCount()
+
+        if cnt > 0:
+            # get index device with number 1
+            self.id = self.lib.nb2GetId(0)
+
+            # open this device
+            err = self.lib.nb2Open(self.id)
+
+            if err == NR_ERR_OK:
+                self.connected = True
+
+        return self.connected
+
+    def getDeviceInformation(self):
+        """
+        Getting information about a connected device
+        :return: Serial Number, Model
+        """
+        if self.lib is None:
+            raise AmpError("library nb2mcs.dll not available")
+
+        if self.id == 0:
+            raise AmpError("incorrect device ID")
+
+        # get DLL version
+        self.ampversion.read(self.lib, self.id)
+        print(self.ampversion.DLL())
 
         # get information about open device
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.deviceinfo))
         if err != NR_ERR_OK:
-            return False
-        else:
-            # get the NeoRec amp model and serial number
-            self.model = self.deviceinfo.Model
-            self.sn = self.deviceinfo.SerialNumber
+            return None, None
 
         # get device properties
         err = self.lib.nb2GetProperty(self.id, ctypes.byref(self.properties))
         if err != NR_ERR_OK:
-            return False
+            return None, None
 
         # get device possibility
         pos = t_nb2Possibility()
         err = self.lib.nb2GetPossibility(self.id, ctypes.byref(pos))
         if err != NR_ERR_OK:
-            return False
+            return None, None
 
-        # setting the number of channels depending on the model type
-        # self.CountEeg = pos.ChannelsCount
-        return True
+        return self.deviceinfo.Model, self.deviceinfo.SerialNumber
 
     def start(self):
         """
@@ -650,7 +691,7 @@ class NeoRec:
         # get amplifier battery info
         err = self.lib.nb2GetBattery(self.id, ctypes.byref(battery))
         if err != NR_ERR_OK:
-            return AmpError("failed to read battery info", err)
+            raise AmpError("failed to read battery info", err)
         level = battery.Level / 10  # in percentage, %
         # voltage = battery.Voltage
         # current = battery.Current

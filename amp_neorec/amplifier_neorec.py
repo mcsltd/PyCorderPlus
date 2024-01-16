@@ -179,14 +179,8 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         # search, open and get NeoRec properties
-        res = self.amp.open()
-
-        # if res == NR_ERR_OK and self.amp.CountEeg != self.max_eeg_channels:
-        #     # self.channel_config = EEG_DataBlock.get_default_properties(self.max_eeg_channels, self.max_aux_channels)
-        #     self._create_all_channel_selection()
-        #     self.update_receivers()
-
-        return res
+        connected = self.amp.open()
+        return connected
 
     def _prepare_mode_and_filters(self):
         # translate recording modes
@@ -620,14 +614,16 @@ class AMP_NeoRec(ModuleBase):
         eeg = copy.copy(self.eeg_data)
         return eeg
 
-    def set_info(self):
+    def set_device_info(self):
         """
         Receive and save information about the type of amplifier connected.
         :return:
         """
-        # save amplifier model and serial number
-        self.model = self.amp.info.Model
-        self.sn = self.amp.info.SerialNumber
+        # set device information (serial number, model)
+        self.sn, model = self.amp.getDeviceInformation()
+
+        # if self.model is None or self.model != model:
+        #     self.setDefault()
 
         self._set_eeg_channel_names()
         self.update_receivers()

@@ -1,10 +1,9 @@
 import collections
 import re
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog, \
-    QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QGridLayout, QMessageBox, QFileDialog
 from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtCore import QDir, pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtCore import QDir, QTimer
 from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
 """
@@ -85,7 +84,11 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     Application Main Window Class
     includes main menu, status bar and module handling
     """
+
     signal_parentevent = pyqtSignal("PyQt_PyObject")
+    signal_check_bluetooth = pyqtSignal(bool)
+    signal_search = pyqtSignal(bool)
+    signal_close = pyqtSignal(str)
 
     RESTART = 1
 
@@ -121,6 +124,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.log_dir = ""
         self.loadPreferences()
         self.recording_mode = -1
+
         # self.usageConfirmed = False
 
         # create module chain (top = index 0, bottom = last index)
@@ -144,20 +148,19 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
-            self.stop_search = False
+            self.search = True
+
+            # disabled button select NeoRec in Menu/View
             self.actionNeoRec.setDisabled(True)
 
-            # show a window while searching for an amplifier
-            self.dlgConn = DlgConnectionNeoRec(self)
-            self.dlgConn.signal_hide.connect(self.dlgConn._hide)
-            self.dlgConn.signal_stop_search.connect(self.change_stop_search)
-
             # activate search NeoRec
-            self.neorec_search()
+            self.signal_search.connect(self.search_neorec)
+            self.signal_search.emit(self.search)
+
+            # self.search_neorec()
 
             # self.topmodule.disconnect_signal.connect(self.neorec_search)
             # # actions to find a NeoRec amplifier
-            # self.signal_search.connect(self.neorec_search)
 
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
@@ -198,68 +201,67 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # update button states
         self.updateUI()
 
-    def change_stop_search(self, flag):
-        self.stop_search = flag
+    def change_search(self, flag):
+        self.search = flag
 
-    def neorec_search(self):
+    def search_neorec(self):
         """
         Launching the NeoRec amplifier search window on the network
         :return:
         """
+        # information window for the user about the amplifier search status
+        dlgConn = DlgConnectionNeoRec(self)
+
+        # changing the text according to the bluetooth status on the device
+        self.signal_check_bluetooth.connect(dlgConn.set_text_bluetooth)
+        self.signal_close.connect(dlgConn.closeEvent)
+        dlgConn.signal_search.connect(self.change_search)
+
         # show window search amplifier NeoRec
-        self.dlgConn.show()
+        dlgConn.show()
 
         # start searching for an amplifier
         conn = threading.Thread(target=self._search)
         conn.start()
-        # conn.join()
+
         pass
 
-    def _reconnect(self):
-        """
-        :return:
-        """
-        # show window search amplifier NeoRec
-        self.dlgConn.show()
-
-        # start searching for an amplifier
-        conn = threading.Thread(target=self._search)
-        conn.start()
-        pass
+    def stop_search(self):
+        self.search = False
 
     def _search(self):
         """
         Activation of the NeoRec amplifier search thread
         :return:
         """
-        if self.check_bluetooth() == QBluetoothLocalDevice.HostMode.HostPoweredOff:
-            self.dlgConn.set_text_bluetooth_on()
+        if QBluetoothLocalDevice().hostMode() == QBluetoothLocalDevice.HostMode.HostPoweredOff:
+            self.signal_check_bluetooth.emit(False)
 
         # checking when the user turns on bluetooth
-        res = self.check_bluetooth()
-        while res != QBluetoothLocalDevice.HostMode.HostConnectable and not self.stop_search:
-            res = self.check_bluetooth()
+        res = QBluetoothLocalDevice().hostMode()
+        while res != QBluetoothLocalDevice.HostMode.HostConnectable and self.search:
+            res = QBluetoothLocalDevice().hostMode()
 
-        if self.stop_search:
+        # if the window about connecting to NeoRec is closed
+        if not self.search:
             return
 
-        if res == QBluetoothLocalDevice.HostMode.HostConnectable:
-            self.dlgConn.set_text_bluetooth_search()
+        # if bluetooth is turn, change text in label dlgConn
+        self.signal_check_bluetooth.emit(True)
 
-        # amplifier search
-        res = self.topmodule.connection()
+        # search, connection, obtaining information about the amplifier
+        connected = self.topmodule.connection()
+        while not connected and self.search:
+            connected = self.topmodule.connection()
 
-        if res:
-            self.topmodule.set_info()
-            self.dlgConn.signal_hide.emit()
+        # if the window about connecting to NeoRec is closed
+        if not self.search:
+            return
 
-    def check_bluetooth(self):
-        """
-        Checks Bluetooth status
-        :return:
-        """
-        res = QBluetoothLocalDevice().hostMode()
-        return res
+        if connected:
+            self.signal_close.emit("close")
+            self.topmodule.set_device_info()
+            self.updateModuleInfo()
 
     def _restart(self):
         """
@@ -668,7 +670,7 @@ NeoRec amplifier search window
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
 
     signal_hide = pyqtSignal()
-    signal_stop_search = pyqtSignal(bool)
+    signal_search = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -677,37 +679,46 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
 
         self.label.setPixmap(QPixmap("res/press_button.png"))
 
-        # self.label_2.setText("Please check if Bluetooth and NeoRec amplifier are turned on.")
+        # ToDo: try without the flag
+        self.flag_close = False
+
         # set text by default in label
-        self.set_text_bluetooth_search()
+        self.set_text_bluetooth(False)
         self.label_2.setFont(QFont("Ms Shell Dlg 2", 8))
 
         self.setFixedSize(self.size())
-        # screen_size = QApplication.screen()[1].availableSize()
-        # screen_size = parent.size()
-        # x = (screen_size.width() - parent.width()) // 2
-        # y = (screen_size.height() - parent.height()) // 2
-        # self.move(x, y)
+        # positioning the window in the center of the parent
+        QTimer.singleShot(10, self.center_window)
 
-    def set_text_bluetooth_on(self):
-        self.label_2.setText("Please turn on Bluetooth...")
+    def center_window(self):
+        fr = self.frameGeometry()
+        pos = self.screen().availableGeometry().center()
+        fr.moveCenter(pos)
+        self.move(fr.topLeft())
 
-    def set_text_bluetooth_search(self):
-        self.label_2.setText("The Bluetooth network is searching for a NeoRec amplifier...")
-
-    def _hide(self):
-        self.hide()
+    def set_text_bluetooth(self, flag):
+        if flag:
+            self.label_2.setText("The Bluetooth network is searching for a NeoRec amplifier...")
+        else:
+            self.label_2.setText("Please turn on Bluetooth...")
 
     def closeEvent(self, event):
-        result = QMessageBox.question(self, "Window close confirmation",
-                                      "Are you sure you want to close the window and stop searching for NeoRec devices?",
-                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                      QMessageBox.StandardButton.No)
-        if result == QMessageBox.StandardButton.Yes:
-            self.signal_stop_search.emit(True)
+        if type(event) is str and event == "close":
+            self.flag_close = True
+            self.signal_search.emit(False)  # stop search in MainWindow
             self.close()
-        else:
-            event.ignore()
+
+        if not self.flag_close:
+            result = QMessageBox.question(self, "Window close confirmation",
+                                          "Are you sure you want to close the window and stop searching for NeoRec devices?",
+                                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                          QMessageBox.StandardButton.No)
+            if result == QMessageBox.StandardButton.Yes:
+                self.signal_search.emit(False)  # stop search in MainWindow
+                self.close()
+            elif result == QMessageBox.StandardButton.No:
+                event.ignore()
+
 
 
 '''
