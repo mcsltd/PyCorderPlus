@@ -268,8 +268,7 @@ class AMP_NeoRec(ModuleBase):
     def process_event(self, event):
         """
         Handle events from attached receivers
-        :param event:
-        :return:
+        :param event: ModuleEvent
         """
         if event.type == EventType.COMMAND:
             # check for stop command
@@ -636,10 +635,20 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         # set device information (serial number, model)
-        self.sn, model = self.amp.getDeviceInformation()
+        self.sn, self.model = self.amp.getDeviceInformation()
 
         # if self.model is None or self.model != model:
         #     self.setDefault()
+
+        # send an event to display to adapt the possible number of channels
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info=self.amp.CountEeg,
+                status_field="Changed channel count"
+            )
+        )
 
         self._set_eeg_channel_names()
         self.update_receivers()

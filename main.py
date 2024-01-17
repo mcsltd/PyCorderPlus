@@ -157,11 +157,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.signal_search.connect(self.search_neorec)
             self.signal_search.emit(self.search)
 
-            # self.search_neorec()
-
-            # self.topmodule.disconnect_signal.connect(self.neorec_search)
-            # # actions to find a NeoRec amplifier
-
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
 
