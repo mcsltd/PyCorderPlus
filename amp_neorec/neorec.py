@@ -226,7 +226,7 @@ class AmpVersion:
         :return: str
         """
         if self.version.Dll != 0 and self.version.Firmware != 0:
-            info = f"DLL: {self._getVersionPrettyStringDll(self.version.Dll)} " \
+            info = f" DLL: {self._getVersionPrettyStringDll(self.version.Dll)} " \
                    f"Firmware: {self._getVersionPrettyStringFirmware(self.version.Firmware)}"
         else:
             info = ""
@@ -415,6 +415,7 @@ class NeoRec:
         if err != NR_ERR_OK:
             return None, None
 
+        self.CountEeg = pos.ChannelsCount
         return self.deviceinfo.Model, self.deviceinfo.SerialNumber
 
     def start(self):
