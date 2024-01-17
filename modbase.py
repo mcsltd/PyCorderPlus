@@ -89,7 +89,7 @@ class EventType:
     @ivar COMMAND: send an command to the module chain
     @ivar LOG: only log the message, without showing it in the status bar
     """
-    (LOGMESSAGE, STATUS, MESSAGE, ERROR, COMMAND, LOG) = range(6)
+    (LOGMESSAGE, STATUS, MESSAGE, ERROR, COMMAND, LOG, DISCONNECTED) = range(7)
 
 
 class ErrorSeverity:
