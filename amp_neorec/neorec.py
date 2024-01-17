@@ -209,7 +209,6 @@ class AmpError(Exception):
 class AmpVersion:
     def __init__(self):
         self.version = t_nb2Version()
-        pass
 
     def read(self, lib, idx):
         """
@@ -220,6 +219,40 @@ class AmpVersion:
         """
         res = lib.nb2GetVersion(idx, ctypes.byref(self.version))
         return res
+
+    def info(self):
+        """
+        Get all amplifier firmware versions as string
+        :return: str
+        """
+        print(self.version.Dll)
+        if self.version.Dll != 0 and self.version.Firmware != 0:
+            info = f"DLL: {self._getVersionPrettyStringDll(self.version.Dll)} " \
+                   f"Firmware: {self._getVersionPrettyStringFirmware(self.version.Firmware)}"
+        else:
+            info = ""
+        return info
+
+    def _getVersionPrettyStringFirmware(self, firmwareversion):
+        """
+        converts the firmware version to a string
+        :param firmwareversion:
+        :return: str
+        """
+        version = str((firmwareversion >> 48) % 0x10000) + '.' \
+                  + str((firmwareversion >> 32) % 0x10000) + '.' \
+                  + str(firmwareversion % 0x100000000)
+        return version
+
+    def _getVersionPrettyStringDll(self, dllversion):
+        """
+        converts the DLL version to a string
+        :param dllversion:
+        :return: str
+        """
+        version = str((dllversion >> 48) % 0x10000) + '.' + str((dllversion >> 32) % 0x10000) + '.' + str(
+            (dllversion >> 16) % 0x10000) + '.' + str(dllversion % 0x10000)
+        return version
 
     def DLL(self):
         """ get the DLL version
@@ -300,10 +333,7 @@ class NeoRec:
         self.close()
 
         # reload NeoRec windows library
-        # del self.lib
-        # self.lib = None
         self.loadLib()
-
 
     def loadLib(self):
         """
@@ -322,8 +352,9 @@ class NeoRec:
         except:
             self.lib = None
             if self.x64:
-                # raise AmpError("failed to open library (ActiChamp_x64.dll)")
-                pass
+                raise AmpError("failed to open library (nb2mcs_x64.dll)")
+            else:
+                raise AmpError("failed to open library (nb2mcs_x86.dll)")
 
         # initialization library resources
         res = self.lib.nb2ApiInit()
@@ -368,7 +399,6 @@ class NeoRec:
 
         # get DLL version
         self.ampversion.read(self.lib, self.id)
-        print(self.ampversion.DLL())
 
         # get information about open device
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.deviceinfo))
@@ -396,12 +426,12 @@ class NeoRec:
         if self.running:
             return
         if self.id == 0:
-            raise
+            raise AmpError("device not open")
 
         # start amplifier
         err = self.lib.nb2Start(self.id)
         if err != NR_ERR_OK:
-            raise
+            raise AmpError("failed to start device", err)
 
         self.running = True
         self.readError = False
@@ -433,8 +463,7 @@ class NeoRec:
         Close hardware device.
         """
         if self.lib is None:
-            # raise AmpError("library ActiChamp_x86.dll not available")
-            return
+            raise AmpError("DLL not available")
 
         if self.id != 0:
             if self.running:
@@ -667,9 +696,8 @@ class NeoRec:
             info += f" {NR_Models[self.deviceinfo.Model]} ({self.deviceinfo.Model}) SN: {self.deviceinfo.SerialNumber}"
         else:
             info += " n.a.\n"
-        # get firmware versions
-        # info += self.ampversion.info() + "\n"
-        # return info
+        # get DLL, firmware versions
+        info += self.ampversion.info() + "\n"
         return info
 
     def getDeviceStatus(self):
