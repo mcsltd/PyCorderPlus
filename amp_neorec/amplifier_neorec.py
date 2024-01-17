@@ -96,20 +96,28 @@ class AMP_NeoRec(ModuleBase):
         Qt widgets are not reusable, so we have to create it every time
         """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        # read amplifier configuration
-        self.amp.readConfiguration(
-            rate=self.sample_rate["base"],
-            range=self.dynamic_range["base"],
-            boost=self.performance_mode["base"],
-            force=True
-        )
+
+        try:
+            # read amplifier configuration
+            self.amp.readConfiguration(
+                rate=self.sample_rate["base"],
+                range=self.dynamic_range["base"],
+                boost=self.performance_mode["base"],
+                force=True
+            )
+        except Exception as err:
+            print(err)
+
         self.update_receivers()
+
         QApplication.restoreOverrideCursor()
+
         # create configuration pane
         config = _DeviceConfigurationPane(self)
         config.rateChanged.connect(self._samplerate_changed)
         config.rangeChanged.connect(self._dynamicrange_changed)
         config.modeChanged.connect(self._performancemode_changed)
+
         return config
 
     def _dynamicrange_changed(self, index):
@@ -173,20 +181,15 @@ class AMP_NeoRec(ModuleBase):
         # prepare recording mode and anti aliasing filters
         self._prepare_mode_and_filters()
 
-    def connection(self):
+    def connection_amp(self):
         """
         NeoRec amplifier detection and opening
         :return:
         """
         # search, open and get NeoRec properties
-        res = self.amp.open()
+        connected = self.amp.open()
+        return connected
 
-        # if res == NR_ERR_OK and self.amp.CountEeg != self.max_eeg_channels:
-        #     # self.channel_config = EEG_DataBlock.get_default_properties(self.max_eeg_channels, self.max_aux_channels)
-        #     self._create_all_channel_selection()
-        #     self.update_receivers()
-
-        return res
 
     def _prepare_mode_and_filters(self):
         # translate recording modes
@@ -302,7 +305,7 @@ class AMP_NeoRec(ModuleBase):
                 boost=self.performance_mode["base"],
             )
         except Exception as err:
-            pass
+            self.send_exception(err)
 
         # create channel selection maps
         self._create_all_channel_selection()
@@ -318,7 +321,6 @@ class AMP_NeoRec(ModuleBase):
         )
 
         return copy.copy(self.eeg_data)
-
 
     def get_module_info(self):
         """ Get information about this module for the about dialog
@@ -421,7 +423,6 @@ class AMP_NeoRec(ModuleBase):
     def _check_ble(self):
         # read amplifier ble utilization level
         ble = self.amp.getDeviceStatus()[0]
-        print(ble)
         pass
 
     def process_output(self):
@@ -436,7 +437,7 @@ class AMP_NeoRec(ModuleBase):
 
         # check level battery voltage and BLE utilization level every 5s
         if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
-            self._check_ble()
+            # self._check_ble()
             self._check_battery()
             self.battery_timer = t
 
@@ -455,14 +456,23 @@ class AMP_NeoRec(ModuleBase):
 
         if d is None:
             self.acquisitionTimeoutCounter += 1
-
             # about 5s timeout
-            if self.acquisitionTimeoutCounter > 500:
+            if self.acquisitionTimeoutCounter > 1000:
                 self.acquisitionTimeoutCounter = 0
-                self.amp.connected = False
-                # add search device NeoRec signal
-                # raise
 
+                self.amp.reset()
+                # self.amp.connected = False
+
+                # Send a connection break event
+                self.send_event(
+                    ModuleEvent(
+                        self._object_name,
+                        EventType.DISCONNECTED,
+                        info="Disconnected"
+                    )
+                )
+
+                raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
             return None
         else:
             self.acquisitionTimeoutCounter = 0
@@ -620,14 +630,16 @@ class AMP_NeoRec(ModuleBase):
         eeg = copy.copy(self.eeg_data)
         return eeg
 
-    def set_info(self):
+    def set_device_info(self):
         """
         Receive and save information about the type of amplifier connected.
         :return:
         """
-        # save amplifier model and serial number
-        self.model = self.amp.info.Model
-        self.sn = self.amp.info.SerialNumber
+        # set device information (serial number, model)
+        self.sn, model = self.amp.getDeviceInformation()
+
+        # if self.model is None or self.model != model:
+        #     self.setDefault()
 
         self._set_eeg_channel_names()
         self.update_receivers()
