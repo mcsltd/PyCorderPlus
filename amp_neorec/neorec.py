@@ -225,7 +225,6 @@ class AmpVersion:
         Get all amplifier firmware versions as string
         :return: str
         """
-        print(self.version.Dll)
         if self.version.Dll != 0 and self.version.Firmware != 0:
             info = f"DLL: {self._getVersionPrettyStringDll(self.version.Dll)} " \
                    f"Firmware: {self._getVersionPrettyStringFirmware(self.version.Firmware)}"
