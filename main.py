@@ -223,7 +223,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # start searching for an amplifier
         conn = threading.Thread(target=self._search)
         conn.start()
-
         pass
 
     def stop_search(self):
@@ -250,9 +249,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.signal_check_bluetooth.emit(True)
 
         # search, connection, obtaining information about the amplifier
-        connected = self.topmodule.connection()
+        connected = self.topmodule.connection_amp()
         while not connected and self.search:
-            connected = self.topmodule.connection()
+            connected = self.topmodule.connection_amp()
 
         # if the window about connecting to NeoRec is closed
         if not self.search:
@@ -565,10 +564,18 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         @param event: ModuleEvent object
         Stop acquisition on errors with a severity > 1
         """
-
         # process commands
         if event.type == EventType.COMMAND:
             return
+
+        # Actions to take if the connection to the amplifier NeoRec is lost
+        if event.type == EventType.DISCONNECTED:
+            self.topmodule.stop(force=True)
+            # start search
+            if not self.search:
+                self.search = True
+                # start search NeoRec
+                self.search_neorec()
 
         # recording mode changed?
         if event.type == EventType.STATUS:

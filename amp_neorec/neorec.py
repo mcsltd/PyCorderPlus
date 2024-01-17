@@ -234,9 +234,11 @@ class NeoRec:
 
         # set default values
         self.id = 0  # Device id
+
         self.connected = False  # Connected to amplifier
         self.running = False  # Data acquisition running
         self.readError = False  # an error occurred during data acquisition
+
         self.buffer = ctypes.create_string_buffer(10000 * 1024)  #: raw data transfer buffer
 
         self.properties = t_nb2Property()  # NeoRec property structure
@@ -283,6 +285,26 @@ class NeoRec:
         self.lib = None
         self.loadLib()
 
+    def reset(self):
+        """
+        What to do if the connection to the amplifier is lost
+        :return:
+        """
+        # set default values
+        self.id = 0  # Device id
+
+        self.connected = False  # Connected to amplifier
+        self.running = False  # Data acquisition running
+        self.readError = False  # an error occurred during data acquisition
+
+        self.close()
+
+        # reload NeoRec windows library
+        # del self.lib
+        # self.lib = None
+        self.loadLib()
+
+
     def loadLib(self):
         """
         Load windows library
@@ -307,7 +329,6 @@ class NeoRec:
         res = self.lib.nb2ApiInit()
         if res != NR_ERR_OK:
             AmpError("can't initialize library resources")
-
 
     def open(self):
         """
@@ -394,11 +415,15 @@ class NeoRec:
         """
         if not self.running:
             return
+
         self.running = False
+
         if self.id is None:
             # raise AmpError("device not open")
             pass
+
         err = self.lib.nb2Stop(self.id)
+
         if err != NR_ERR_OK:
             # raise AmpError("failed to stop device", err)
             pass
@@ -415,8 +440,8 @@ class NeoRec:
             if self.running:
                 self.stop()
             err = self.lib.nb2Close(self.id)
-            if err == NR_ERR_OK:
-                self.lib.nb2ApiDone()
+
+        err = self.lib.nb2ApiDone()
 
     def getSamplingRateBase(self, samplingrate):
         """
@@ -456,12 +481,12 @@ class NeoRec:
         :param boost: device base performance mode
         :param force:
         """
-        # not possible if device is already open or not necessary if rate, range, performance mode has not changed
-        if (self.id != 0 and
-            rate == self.settings.DataRate and
-            range == self.settings.InputRange) \
-                and not force:
+        # No need to update if the settings have not changed
+        if (rate == self.settings.DataRate and
+                range == self.settings.InputRange and
+                boost == self.adjusment.Boost and not force):
             return
+
         # update sampling rate and get new configuration
         try:
             self.setup(
@@ -492,28 +517,41 @@ class NeoRec:
         # set amplifier performance mode
         self.adjusment.Boost = boost
 
+        # # If the amplifier is not connected, then simply updated the parameters in the settings
+        # if not self.connected:
+        #     return NR_ERR_OK
+
         # transfer adjusment to amplifier
         err = self.lib.nb2SetAdjustment(self.id, ctypes.byref(self.adjusment))
+
         if err != NR_ERR_OK:
-            return False
+            return err
+
+        # # runtime error handler for adjusment to amplifier
+        # if err == NR_ERR_FAIL and self.connected:
+        #     raise AmpError("disconnected")
+        # if err != NR_ERR_OK:
+        #     raise AmpError(err, err)
 
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
+
         if err != NR_ERR_OK:
-            return False
+            return err
 
         # set event settings
         err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
+
         if err != NR_ERR_OK:
-            return False
+            return err
 
         # transfer mode to amplifier
         err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
-        if err != NR_ERR_OK:
-            return False
 
-        # if OK return true
-        return True
+        if err != NR_ERR_OK:
+            return err
+
+        return NR_ERR_OK
 
     def read(self, indices, eegcount):
         """
@@ -658,6 +696,7 @@ class NeoRec:
             return None, None
 
         disconnected = None
+
         # read impedance data from device
         err = self.lib.nb2GetImpedance(
             self.id,
@@ -692,6 +731,7 @@ class NeoRec:
         err = self.lib.nb2GetBattery(self.id, ctypes.byref(battery))
         if err != NR_ERR_OK:
             raise AmpError("failed to read battery info", err)
+
         level = battery.Level / 10  # in percentage, %
         # voltage = battery.Voltage
         # current = battery.Current

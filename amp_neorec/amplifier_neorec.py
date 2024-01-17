@@ -96,20 +96,28 @@ class AMP_NeoRec(ModuleBase):
         Qt widgets are not reusable, so we have to create it every time
         """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        # read amplifier configuration
-        self.amp.readConfiguration(
-            rate=self.sample_rate["base"],
-            range=self.dynamic_range["base"],
-            boost=self.performance_mode["base"],
-            force=True
-        )
+
+        try:
+            # read amplifier configuration
+            self.amp.readConfiguration(
+                rate=self.sample_rate["base"],
+                range=self.dynamic_range["base"],
+                boost=self.performance_mode["base"],
+                force=True
+            )
+        except Exception as err:
+            print(err)
+
         self.update_receivers()
+
         QApplication.restoreOverrideCursor()
+
         # create configuration pane
         config = _DeviceConfigurationPane(self)
         config.rateChanged.connect(self._samplerate_changed)
         config.rangeChanged.connect(self._dynamicrange_changed)
         config.modeChanged.connect(self._performancemode_changed)
+
         return config
 
     def _dynamicrange_changed(self, index):
@@ -173,7 +181,7 @@ class AMP_NeoRec(ModuleBase):
         # prepare recording mode and anti aliasing filters
         self._prepare_mode_and_filters()
 
-    def connection(self):
+    def connection_amp(self):
         """
         NeoRec amplifier detection and opening
         :return:
@@ -181,6 +189,7 @@ class AMP_NeoRec(ModuleBase):
         # search, open and get NeoRec properties
         connected = self.amp.open()
         return connected
+
 
     def _prepare_mode_and_filters(self):
         # translate recording modes
@@ -296,7 +305,7 @@ class AMP_NeoRec(ModuleBase):
                 boost=self.performance_mode["base"],
             )
         except Exception as err:
-            pass
+            self.send_exception(err)
 
         # create channel selection maps
         self._create_all_channel_selection()
@@ -312,7 +321,6 @@ class AMP_NeoRec(ModuleBase):
         )
 
         return copy.copy(self.eeg_data)
-
 
     def get_module_info(self):
         """ Get information about this module for the about dialog
@@ -415,7 +423,6 @@ class AMP_NeoRec(ModuleBase):
     def _check_ble(self):
         # read amplifier ble utilization level
         ble = self.amp.getDeviceStatus()[0]
-        print(ble)
         pass
 
     def process_output(self):
@@ -430,7 +437,7 @@ class AMP_NeoRec(ModuleBase):
 
         # check level battery voltage and BLE utilization level every 5s
         if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
-            self._check_ble()
+            # self._check_ble()
             self._check_battery()
             self.battery_timer = t
 
@@ -449,14 +456,23 @@ class AMP_NeoRec(ModuleBase):
 
         if d is None:
             self.acquisitionTimeoutCounter += 1
-
             # about 5s timeout
-            if self.acquisitionTimeoutCounter > 500:
+            if self.acquisitionTimeoutCounter > 1000:
                 self.acquisitionTimeoutCounter = 0
-                self.amp.connected = False
-                # add search device NeoRec signal
-                # raise
 
+                self.amp.reset()
+                # self.amp.connected = False
+
+                # Send a connection break event
+                self.send_event(
+                    ModuleEvent(
+                        self._object_name,
+                        EventType.DISCONNECTED,
+                        info="Disconnected"
+                    )
+                )
+
+                raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
             return None
         else:
             self.acquisitionTimeoutCounter = 0
@@ -525,6 +541,7 @@ class AMP_NeoRec(ModuleBase):
         """
         Stop data acquisition and stop hardware object
         """
+        print("process_stop")
         try:
             self.amp.stop()
         except:
