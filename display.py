@@ -82,13 +82,15 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.online_cfg.checkBoxBaseline.stateChanged.connect(self.baselineNowClicked)
 
         # legend
-        legend = _ScopeLegend()
-        legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
-        self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
-        # ToDo: self.legendDataChanged.connect(self.channelItemClicked)
-        # self.connect(self, Qt.SIGNAL("legendClicked(QwtPlotItem*)"),
-        #              self.channelItemClicked)
+        # legend = _ScopeLegend()
+        # legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        # legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
+        # self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
+
+        self.insertLegend(Qwt.QwtLegend(), Qwt.QwtPlot.LeftLegend)
+        self.legend().setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        self.legend().setDefaultItemMode(Qwt.QwtLegendData.Clickable)
+        self.legend().clicked.connect(self.channelItemClicked)
 
         # grid
         self.grid = Qwt.QwtPlotGrid()
@@ -133,10 +135,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.last_slice = None
 
         # default settings
-        # self.setScale(self.online_cfg.get_scale())  # µV / Division
-        # self.timebase = self.online_cfg.get_timebase()  # s  / Screen
-        self.timebase = 0.1
-        self.setScale(0.5)
+        self.setScale(self.online_cfg.get_scale())  # µV / Division
+        self.timebase = self.online_cfg.get_timebase()  # s  / Screen
+        # self.timebase = 0.1
+        # self.setScale(0.5)
 
         self.xsize = 1500
         self.binning = 300
@@ -360,11 +362,13 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             title.setColor(color)
             title.setPaintAttribute(Qwt.QwtText.PaintUsingTextFont)
             pc = Qwt.QwtPlotCurve(title)
+            # pc = Qwt.QwtPlotCurve()
             pc.setPen(QPen(color, 0))
             pc.setYAxis(Qwt.QwtPlot.yLeft)
             # pc.setCurveAttribute(Qwt.QwtPlotCurve.PaintFiltered)
             pc.attach(self)
             self.traces.append(pc)
+
 
         # # reduce the legend items margin
         # for item in self.legend():
@@ -565,6 +569,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         """
         SIGNAL Channel legend clicked
         """
+
         if self.selectedChannel == plotitem.title().text():
             self.selectedChannel = None
         else:
