@@ -468,7 +468,8 @@ class NeoRec:
         if self.id != 0:
             if self.running:
                 self.stop()
-            err = self.lib.nb2Close(self.id)
+
+        err = self.lib.nb2Close(self.id)
 
         err = self.lib.nb2ApiDone()
 
