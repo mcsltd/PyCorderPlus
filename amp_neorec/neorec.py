@@ -544,27 +544,33 @@ class NeoRec:
         if not self.connected:
             return NR_ERR_OK, connected
 
+        if mode == NR_MODE_IMPEDANCE:
+            err = self.lib.nb2SetImpedanceFrequency(self.id, int(sample_rate[mode]))
+            if err != NR_ERR_OK:
+                connected = False
+                return err, connected
+
         # transfer adjusment to amplifier
         err = self.lib.nb2SetAdjustment(self.id, ctypes.byref(self.adjusment))
-        if err != NR_ERR_OK and self.connected:
+        if err != NR_ERR_OK:
             connected = False
             return err, connected
 
         # transfer settings to amplifier
         err = self.lib.nb2SetDataSettings(self.id, ctypes.byref(self.settings))
-        if err != NR_ERR_OK and self.connected:
+        if err != NR_ERR_OK:
             connected = False
             return err, connected
 
         # set event settings
         err = self.lib.nb2SetEventSettings(self.id, ctypes.byref(self.eset))
-        if err != NR_ERR_OK and self.connected:
+        if err != NR_ERR_OK:
             connected = False
             return err, connected
 
         # transfer mode to amplifier
         err = self.lib.nb2SetMode(self.id, ctypes.byref(self.mode))
-        if err != NR_ERR_OK and self.connected:
+        if err != NR_ERR_OK:
             connected = False
             return err, connected
 
