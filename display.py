@@ -191,7 +191,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         :param event: ModuleEvent
         """
         if event.type == EventType.COMMAND:
-            if event.status_field == "Changed channel count":
+            if event.status_field == "ChangedChannelCount":
                 self.default_group_size = event.info
                 # set new value div in online_cfg (NeoRec cap)
                 self.online_cfg.adapt_group_size(event.info)

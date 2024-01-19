@@ -646,7 +646,7 @@ class AMP_NeoRec(ModuleBase):
                 self._object_name,
                 EventType.COMMAND,
                 info=self.amp.CountEeg,
-                status_field="Changed channel count"
+                status_field="ChangedChannelCount"
             )
         )
 
