@@ -82,13 +82,15 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.online_cfg.checkBoxBaseline.stateChanged.connect(self.baselineNowClicked)
 
         # legend
-        legend = _ScopeLegend()
-        legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
-        self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
-        # ToDo: self.legendDataChanged.connect(self.channelItemClicked)
-        # self.connect(self, Qt.SIGNAL("legendClicked(QwtPlotItem*)"),
-        #              self.channelItemClicked)
+        # legend = _ScopeLegend()
+        # legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        # legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
+        # self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
+
+        self.insertLegend(Qwt.QwtLegend(), Qwt.QwtPlot.LeftLegend)
+        self.legend().setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        self.legend().setDefaultItemMode(Qwt.QwtLegendData.Clickable)
+        self.legend().clicked.connect(self.channelItemClicked)
 
         # grid
         self.grid = Qwt.QwtPlotGrid()
@@ -133,10 +135,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.last_slice = None
 
         # default settings
-        # self.setScale(self.online_cfg.get_scale())  # µV / Division
-        # self.timebase = self.online_cfg.get_timebase()  # s  / Screen
-        self.timebase = 0.1
-        self.setScale(0.5)
+        self.setScale(self.online_cfg.get_scale())  # µV / Division
+        self.timebase = self.online_cfg.get_timebase()  # s  / Screen
+        # self.timebase = 0.1
+        # self.setScale(0.5)
 
         self.xsize = 1500
         self.binning = 300
@@ -144,6 +146,9 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.channel_slice = slice(0, 0, 1)  # channel group selection
         self.baseline_request = False
         self.selectedChannel = None
+
+        # number of channels shown in online_cfg
+        self.default_group_size = 16
 
         # set default display
         self.eeg = EEG_DataBlock()
@@ -174,11 +179,24 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         '''
         self.setScale(self.online_cfg.set_scale(100.0, 1000.0))  # EEG: 100µV, AUX: 1000µV / Division
         self.timebase = self.online_cfg.set_timebase(10.0)  # 10s / Screen
-        self.online_cfg.set_groupsize(16)  # group size 16 channels
+        self.online_cfg.set_groupsize(self.default_group_size)  # group size 16 channels
         self.online_cfg.checkBoxBaseline.setChecked(True)  # baseline correction enabled
 
         # update display
         self.process_update(self.eeg)
+
+    def process_event(self, event):
+        """
+        Handle events from attached receivers
+        :param event: ModuleEvent
+        """
+        if event.type == EventType.COMMAND:
+            if event.status_field == "ChangedChannelCount":
+                self.default_group_size = event.info
+                # set new value div in online_cfg (NeoRec cap)
+                self.online_cfg.adapt_group_size(event.info)
+                self.online_cfg.set_groupsize(self.default_group_size)
+
 
     def process_update(self, params):
         ''' Channel properties have changed, module needs update
@@ -344,11 +362,13 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             title.setColor(color)
             title.setPaintAttribute(Qwt.QwtText.PaintUsingTextFont)
             pc = Qwt.QwtPlotCurve(title)
+            # pc = Qwt.QwtPlotCurve()
             pc.setPen(QPen(color, 0))
             pc.setYAxis(Qwt.QwtPlot.yLeft)
             # pc.setCurveAttribute(Qwt.QwtPlotCurve.PaintFiltered)
             pc.attach(self)
             self.traces.append(pc)
+
 
         # # reduce the legend items margin
         # for item in self.legend():
@@ -549,6 +569,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         """
         SIGNAL Channel legend clicked
         """
+
         if self.selectedChannel == plotitem.title().text():
             self.selectedChannel = None
         else:
@@ -722,6 +743,7 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         self.group_indices = dict()
         self.group_slices = defaultdict(list)
 
+        self.max_group_size = 32
         self.group_size = int(self.comboBoxGroupSize.currentText())
 
         self.checkBoxBaseline.setChecked(False)
@@ -766,6 +788,25 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         time = self.comboBoxTime.itemData(self.comboBoxTime.currentIndex())
         return time
 
+    def adapt_group_size(self, channel):
+        """
+        Adapt groupsize to the number of channels in the amplifier (only for NeoRec)
+        :param channel:
+        :return:
+        """
+        # for NeoRec 21, 21s
+        if channel == 21:
+            self.comboBoxGroupSize.clear()
+            for div in ["1", "3", "7", "21"]:
+                self.comboBoxGroupSize.addItem(div)
+                self.max_group_size = 21
+        # for NeoRec cap
+        if channel == 16:
+            self.comboBoxGroupSize.clear()
+            for div in ["1", "2", "4", "8", "16"]:
+                self.comboBoxGroupSize.addItem(div)
+                self.max_group_size = 16
+
     def get_groupscale(self):
         """ Get scale values for EEG and AUX channels
         @return: float EEG and AUX scale
@@ -779,7 +820,7 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         if value >= 0:
             self.group_size = int(self.comboBoxGroupSize.currentText())
         else:
-            self.group_size = 32
+            self.group_size = self.max_group_size
         self._slice_channels()
 
     def _slice_channels(self):
