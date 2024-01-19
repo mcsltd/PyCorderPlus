@@ -337,26 +337,29 @@ class AMP_NeoRec(ModuleBase):
         self.battery_timer = 0
         self.test_counter = 0
 
-        # check battery
-        ok, level = self._check_battery()
-        if not ok:
-            raise ModuleError(self._object_name, f"level battery low {level} %!")
-
         # setup hardware
-        flag = self.amp.setup(
+        _, connected = self.amp.setup(
             mode=self.recording_mode,
             rate=self.sample_rate["base"],
             range=self.dynamic_range["base"],
             boost=self.performance_mode["base"]
         )
+        if not connected:
+            self.amp.reset()
+            # Send a connection break event
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.DISCONNECTED,
+                    info="Disconnected"
+                )
+            )
+            raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
 
-        # case of disconnection
-        # if not flag:
-        #     # set connection state
-        #     self.amp.connected = False
-        #     # emit signal start search device
-        #     self.disconnect_signal.emit()
-        #     raise ModuleError(self._object_name, "disconnected")
+        # check battery
+        ok, level = self._check_battery()
+        if not ok:
+            raise ModuleError(self._object_name, f"level battery low {level} %!")
 
         self.update_receivers()
 
@@ -398,7 +401,20 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         # read amplifier battery voltage level
-        level = self.amp.getBatteryInfo()
+        level, connected = self.amp.getBatteryInfo()
+
+        if not connected:
+            self.amp.reset()
+            # Send a connection break event
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.DISCONNECTED,
+                    info="Disconnected"
+                )
+            )
+            raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
+
         # assess battery level
         severe = ErrorSeverity.IGNORE
         if level < 15:
@@ -595,15 +611,24 @@ class AMP_NeoRec(ModuleBase):
         """
         # send values only once per second
         t = time.process_time()
-        if (t - self.impedance_timer) < 1.0:
+        if (t - self.impedance_timer) < 0.1:
             return None
         self.impedance_timer = t
 
         # get impedance values from device
-        imp, disconnected = self.amp.readImpedances()
+        imp, connected = self.amp.readImpedances()
 
-        if imp is None:
-            return None
+        if not connected:
+            self.amp.reset()
+            # Send a connection break event
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.DISCONNECTED,
+                    info="Disconnected"
+                )
+            )
+            raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
 
         eeg_imp = imp[self.eeg_indices]
         gnd_imp = imp[-1]
