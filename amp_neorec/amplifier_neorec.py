@@ -700,6 +700,17 @@ class AMP_NeoRec(ModuleBase):
             )
         )
 
+        # send an event to the storage module to change the amplifier name
+        # send an event to display to adapt the possible number of channels
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info=NR_Models[self.sn],
+                status_field="ChangeAmp"
+            )
+        )
+
         self._set_eeg_channel_names()
         self.update_receivers()
 

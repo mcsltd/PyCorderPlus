@@ -76,6 +76,9 @@ class StorageVision(ModuleBase):
         self.last_impedance_config = None  #: last received impedance configuration EEG block
         self.moduledescription = ""  #: description of connected modules
 
+        # Amplifier name
+        self.name_device = "actiCHamp"
+
         # configuration data
         self.setDefault()
 
@@ -345,7 +348,7 @@ class StorageVision(ModuleBase):
         if command == "Stop":
             ret = QMessageBox.question(
                 None,
-                "PyCorder",
+                "PyCorderPlus",
                 "Stop Recording?",
                 QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel
             )
@@ -383,6 +386,9 @@ class StorageVision(ModuleBase):
             if event.info == "StopSaving":
                 self._close_recording()
 
+            if event.status_field == "ChangeAmp":
+                self.name_device = event.info
+
     def _prepare_recording(self):
         """ Create and prepare EEG data, header and marker file
         """
@@ -398,39 +404,39 @@ class StorageVision(ModuleBase):
             fname, ext = os.path.splitext(self.file_name)
             headername = fname + ".vhdr"
             markername = fname + ".vmrk"
-            crlf = u"\n"
+            crlf = "\n"
 
             # create EEG header file
             try:
                 self.header_file = open(headername, "w")
                 # ToDo: add data from which device the data is being recorded
-                h = u"Brain Vision Data Exchange Header File Version 1.0" + crlf
-                h += u"; Data created by the actiCHamp PyCorder" + crlf + crlf
+                h = "Brain Vision Data Exchange Header File Version 1.0" + crlf
+                h += f"; Data created by the {self.name_device} PyCorderPlus" + crlf + crlf
 
                 # common infos.
-                h += u"[Common Infos]" + crlf
-                h += u"Codepage=UTF-8" + crlf
-                h += u"DataFile=" + os.path.split(self.file_name)[1] + crlf
-                h += u"MarkerFile=" + os.path.split(markername)[1] + crlf
-                h += u"DataFormat=BINARY" + crlf
-                h += u"; Data orientation: MULTIPLEXED=ch1,pt1, ch2,pt1 ..." + crlf
-                h += u"DataOrientation=MULTIPLEXED" + crlf
-                h += u"NumberOfChannels=%d" % (len(self.params.channel_properties)) + crlf
-                h += u"; Sampling interval in microseconds" + crlf
+                h += "[Common Infos]" + crlf
+                h += "Codepage=UTF-8" + crlf
+                h += "DataFile=" + os.path.split(self.file_name)[1] + crlf
+                h += "MarkerFile=" + os.path.split(markername)[1] + crlf
+                h += "DataFormat=BINARY" + crlf
+                h += "; Data orientation: MULTIPLEXED=ch1,pt1, ch2,pt1 ..." + crlf
+                h += "DataOrientation=MULTIPLEXED" + crlf
+                h += "NumberOfChannels=%d" % (len(self.params.channel_properties)) + crlf
+                h += "; Sampling interval in microseconds" + crlf
                 usSR = 1000000.0 / self.params.sample_rate
                 if int(usSR) == usSR:
-                    h += u"SamplingInterval=%d" % usSR + crlf
+                    h += "SamplingInterval=%d" % usSR + crlf
                 else:
-                    h += u"SamplingInterval=%.5f" % usSR + crlf
+                    h += "SamplingInterval=%.5f" % usSR + crlf
                 h += crlf
-                h += u"[Binary Infos]" + crlf
-                h += u"BinaryFormat=IEEE_FLOAT_32" + crlf
+                h += "[Binary Infos]" + crlf
+                h += "BinaryFormat=IEEE_FLOAT_32" + crlf
                 h += crlf
-                h += u"[Channel Infos]" + crlf
-                h += u"; Each entry: Ch<Channel number>=<Name>,<Reference channel name>," + crlf
-                h += u"; <Scaling factor in \"Unit\">,<Unit>, Future extensions.." + crlf
-                h += u"; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
-                h += u"; Commas in channel names are coded as \"\\1\"." + crlf
+                h += "[Channel Infos]" + crlf
+                h += "; Each entry: Ch<Channel number>=<Name>,<Reference channel name>," + crlf
+                h += "; <Scaling factor in \"Unit\">,<Unit>, Future extensions.." + crlf
+                h += "; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
+                h += "; Commas in channel names are coded as \"\\1\"." + crlf
 
                 # channel configuration
                 ch = 1
@@ -440,23 +446,23 @@ class StorageVision(ModuleBase):
                     if len(channel.unit) > 0:
                         unit = channel.unit
                     else:
-                        unit = u"µV"
-                    h += u"Ch%d=%s,%s,1.0,%s" % (ch, lbl, refLabel, unit) + crlf
+                        unit = "µV"
+                    h += "Ch%d=%s,%s,1.0,%s" % (ch, lbl, refLabel, unit) + crlf
                     ch += 1
 
                 # recorder info
                 h += crlf
-                h += u"[Comment]" + crlf
+                h += "[Comment]" + crlf
                 h += self.moduledescription
                 h += crlf
 
                 # reference channel names
-                h += u"Reference channel: %s" % self.params.ref_channel_name + crlf
+                h += "Reference channel: %s" % self.params.ref_channel_name + crlf
 
                 # impedance values if available
                 if self.last_impedance is not None:
                     h += crlf
-                    h += u"Impedance [KOhm] at %s (recording started at %s)" % (
+                    h += "Impedance [KOhm] at %s (recording started at %s)" % (
                         self.last_impedance.block_time.strftime("%H:%M:%S"),
                         datetime.datetime.now().strftime("%H:%M:%S")) + crlf
 
@@ -488,12 +494,12 @@ class StorageVision(ModuleBase):
                             gndImpedance = self.last_impedance.eeg_channels[idx, ImpedanceIndex.GND]
 
                         if len(impedanceText) > 0:
-                            h += u"%3d %s: %s" % (ch.input, ch.name, impedanceText) + crlf
+                            h += "%3d %s: %s" % (ch.input, ch.name, impedanceText) + crlf
 
                     # GND electrode
                     if gndImpedance is not None:
                         val = self._getImpedanceValueText(gndImpedance)
-                        h += u"GND: %s" % val + crlf
+                        h += "GND: %s" % val + crlf
 
                 self.header_file.write(h)
                 self.header_file.close()
@@ -504,19 +510,19 @@ class StorageVision(ModuleBase):
             # create EEG marker file
             try:
                 self.marker_file = open(markername, "w")
-                h = u"Brain Vision Data Exchange Marker File, Version 1.0" + crlf
+                h = "Brain Vision Data Exchange Marker File, Version 1.0" + crlf
                 h += crlf
                 # common infos.
-                h += u"[Common Infos]" + crlf
-                h += u"Codepage=UTF-8" + crlf
-                h += u"DataFile=" + os.path.split(self.file_name)[1] + crlf
+                h += "[Common Infos]" + crlf
+                h += "Codepage=UTF-8" + crlf
+                h += "DataFile=" + os.path.split(self.file_name)[1] + crlf
                 h += crlf
                 # Marker infos.
-                h += u"[Marker Infos]" + crlf
-                h += u"; Each entry: Mk<Marker number>=<Type>,<Description>,<Position in data points>," + crlf
-                h += u"; <Size in data points>, <Channel number (0 = marker is related to all channels)>" + crlf
-                h += u"; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
-                h += u"; Commas in type or description text are coded as \"\\1\"." + crlf
+                h += "[Marker Infos]" + crlf
+                h += "; Each entry: Mk<Marker number>=<Type>,<Description>,<Position in data points>," + crlf
+                h += "; <Size in data points>, <Channel number (0 = marker is related to all channels)>" + crlf
+                h += "; Fields are delimited by commas, some fields might be omitted (empty)." + crlf
+                h += "; Commas in type or description text are coded as \"\\1\"." + crlf
 
                 self.marker_file.write(h)
                 self.marker_file.flush()
@@ -563,9 +569,9 @@ class StorageVision(ModuleBase):
         if not eegdir.exists():
             raise Exception("path '%s' does not exist" % pn)
         eegdir.setFilter(QDir.Filter.Files)
-        eegdir.setNameFilters([u"%s*.eeg" % fn])
+        eegdir.setNameFilters(["%s*.eeg" % fn])
         allfiles = eegdir.entryList()
-        eegdir.setNameFilters([u"%s_*.eeg" % fn])
+        eegdir.setNameFilters(["%s_*.eeg" % fn])
         numberedfiles = eegdir.entryList()
 
         if allfiles.count() == 0:
@@ -585,7 +591,7 @@ class StorageVision(ModuleBase):
             fnum = numbers[-1] + 1
         else:
             fnum = 1
-        newfilename = os.path.join(pn, u"%s_%d.eeg" % (filename, fnum))
+        newfilename = os.path.join(pn, "%s_%d.eeg" % (filename, fnum))
 
         # verify that the file is not yet existing
         if QFile.exists(newfilename):
@@ -650,9 +656,9 @@ class StorageVision(ModuleBase):
                 if len(self.default_path) > 0:
                     dlg.setDirectory(self.default_path)
                 dlg.selectFile(self._get_auto_filename(dlg.directory()))
-                namefilters = [u"EEG files (*.eeg)"]
+                namefilters = ["EEG files (*.eeg)"]
                 if self.default_autoname and (len(self.default_prefix) > 0):
-                    namefilters.insert(0, u"EEG files (%s*.eeg)" % self.default_prefix)
+                    namefilters.insert(0, "EEG files (%s*.eeg)" % self.default_prefix)
                 dlg.setNameFilters(namefilters)
                 ok = False
                 if dlg.exec():
