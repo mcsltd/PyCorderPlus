@@ -546,7 +546,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 f.close()
             except Exception as e:
                 tb = GetExceptionTraceBack()[0]
-                QMessageBox.critical(None, "PyCorder",
+                QMessageBox.critical(None, "PyCorderPlus",
                                      "Failed to write log file (%s)\n" % file_name +
                                      tb + " -> " + str(e))
 
@@ -1180,6 +1180,7 @@ def main(args):
     """
     Create and start up main application
     """
+    print("Starting PyCorderPlus, please wait ...")
     try:
         res = MainWindow.RESTART
         while res == MainWindow.RESTART:
@@ -1201,9 +1202,9 @@ def main(args):
             del win
     except Exception as e:
         tb = GetExceptionTraceBack()[0]
-        QMessageBox.critical(None, "PyCorder", tb + " -> " + str(e))
+        QMessageBox.critical(None, "PyCorderPlus", tb + " -> " + str(e))
 
-    print("PyCorder terminated")
+    print("PyCorderPlus terminated")
 
 
 if __name__ == "__main__":

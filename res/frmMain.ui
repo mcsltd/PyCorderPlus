@@ -161,7 +161,7 @@
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>View</string>
+     <string>Amplifiers</string>
     </property>
     <widget class="QMenu" name="menuSelect_Amplifier">
      <property name="title">
