@@ -696,7 +696,7 @@ class ActiChamp:
         if err != CHAMP_ERR_OK:
             raise AmpError("failed to stop device", err)
 
-    # ToDo: write test case for this method
+
     def getEmulationMode(self):
         """
         Lookup emulation and PLL configuration flag in INI file
@@ -818,6 +818,7 @@ class ActiChamp:
             bytesread = self.lib.champGetDataBlocking(self.devicehandle,
                                                       ctypes.byref(self.buffer, self.binning_offset),
                                                       requestedbytes)
+
         blocktime = (time.process_time() - self.BlockTimer)
         self.BlockTimer = time.process_time()
 
@@ -1154,7 +1155,6 @@ class ActiChamp:
                 ini.set("Emulation", "Model", repr(channels))
             else:
                 ini.set("Main", "Emulation", "0")
-            # ToDo: add with open ...
             fp = open(filename, "w")
             ini.write(fp)
             fp.close()

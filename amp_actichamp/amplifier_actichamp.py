@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 Acquisition Module
 
 PyCorderPlus ActiChamp Recorder
@@ -11,7 +11,7 @@ Copyright (C) 2024, Medical Computer Systems Ltd
 
 
 This file is part of PyCorderPlus
-'''
+"""
 import time
 from operator import itemgetter
 
@@ -268,7 +268,6 @@ class AMP_ActiChamp(ModuleBase):
             else:
                 channel.enable = False  # disable all AUX channels
         self._set_default_filter()
-        # ToDo: self.inputDevices.reset()
         self.update_receivers()
 
     def stop(self, force=False):
@@ -626,10 +625,6 @@ class AMP_ActiChamp(ModuleBase):
         sampletime = self.eeg_data.sample_channel[0][0] / self.eeg_data.sample_rate
         self.eeg_data.block_time = self.start_time + datetime.timedelta(seconds=sampletime)
 
-        # ToDo: process connected input devices
-        # if not AMP_MONTAGE:
-        #     self.inputDevices.process_input(self.eeg_data)
-
         # put it into the receiver queues
         eeg = copy.copy(self.eeg_data)
         self.recordtime = time.process_time() - t
@@ -728,10 +723,6 @@ class AMP_ActiChamp(ModuleBase):
                                         status_field="Channels"))
         else:
             self._create_all_channel_selection()
-            # try:
-            #     self.inputDevices.process_update(self.eeg_data)
-            # except Exception as e:
-            #     self.send_exception(e)
 
         # send current status as event
         self.send_event(ModuleEvent(self._object_name,

@@ -110,6 +110,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     signal_parentevent = pyqtSignal("PyQt_PyObject")
     signal_check_bluetooth = pyqtSignal(bool)
     signal_search = pyqtSignal(bool)
+
     signal_close = pyqtSignal(str)
 
     RESTART = 1
@@ -147,8 +148,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.loadPreferences()
         self.recording_mode = -1
 
-        # self.usageConfirmed = False
-
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
 
@@ -171,13 +170,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.search = True
-
             # disabled button select NeoRec in Menu/View
             self.actionNeoRec.setDisabled(True)
-
             # activate search NeoRec
             self.signal_search.connect(self.search_neorec)
             self.signal_search.emit(self.search)
+            # adapt the status bar to NeoRec
+            self.statusWidget.adapt_statusBar(self.topmodule.__class__.__name__)
 
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
@@ -692,7 +691,6 @@ NeoRec amplifier search window
 
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
-
     signal_hide = pyqtSignal()
     signal_search = pyqtSignal(bool)
 
@@ -742,7 +740,6 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
                 self.close()
             elif result == QMessageBox.StandardButton.No:
                 event.ignore()
-
 
 
 '''
@@ -886,6 +883,9 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         self.labelInfo.setText("Medical Computer Systems Ltd, PyCorderPlus V" + __version__)
         self.labelStatus_4.setAutoFillBackground(True)
 
+        # name amplifier
+        self.amp = AMP_ActiChamp.__name__
+
         # log entries
         self.logFifo = collections.deque(maxlen=10000)
         self.lockError = False
@@ -906,7 +906,13 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         self.utilizationFifo = collections.deque()
         self.utilizationUpdateCounter = 0
         self.utilizationMaxValue = 0
-        self.updateUtilization(0)
+
+        if self.amp == AMP_ActiChamp.__name__:
+            self.updateUtilization(0)
+
+        if self.amp == AMP_NeoRec.__name__:
+            self.updateBatteryLevel(0)
+            self.labelStatus_4.setText(f"BLE: 0%")
 
     def updateUtilization(self, utilization):
         """
@@ -966,6 +972,48 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
             """)
             pass
 
+    def updateBatteryLevel(self, level):
+        """
+        Update battery level in progress bar (only NeoRec)
+        :param level: int
+        """
+        # update progress bar
+        if level < 100:
+            self.progressBarUtilization.setValue(int(level))
+        else:
+            self.progressBarUtilization.setValue(100)
+        self.progressBarUtilization.setFormat(f"{level}% Battery Level")
+
+        # modify progress bar color (>5% -> green, <=5% -> red)
+        if level > 5:
+            self.progressBarUtilization.setStyleSheet("""
+                        QProgressBar {
+                            padding: 1px;
+                            text-align: right;
+                            margin-right: 17ex;
+                        }
+
+                        QProgressBar::chunk {
+                            background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 lime, stop: 0 white);
+                            margin: 0.5px;
+                        }
+                    """)
+            pass
+        else:
+            self.progressBarUtilization.setStyleSheet("""
+                        QProgressBar {
+                            padding: 1px;
+                            text-align: right;
+                            margin-right: 17ex;
+                        }
+
+                        QProgressBar::chunk {
+                            background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 red, stop: 0 white);
+                            margin: 0.5px;
+                        }
+                    """)
+            pass
+
     def updateEventStatus(self, event):
         """
         Update status info field and put events into the log fifo
@@ -1002,8 +1050,14 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
                 else:
                     palette.setColor(self.labelStatus_4.backgroundRole(), self.defaultBkColor)
                 self.labelStatus_4.setPalette(palette)
-            elif event.status_field == "Utilization":
+            elif event.status_field == "Utilization" and self.amp == AMP_ActiChamp.__name__:
                 self.updateUtilization(event.info)
+            elif event.status_field == "BatteryNeoRec" and self.amp == AMP_NeoRec.__name__:
+                self.updateBatteryLevel(event.info)
+                # add process severity
+            elif event.status_field == "BLEUtilization":
+                self.labelStatus_4.setText(f"BLE: {event.info}%")
+
             return
 
         # lock an error display until LogView is shown
@@ -1067,6 +1121,17 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
         self.labelInfo.setPalette(palette)
 
+    def adapt_statusBar(self, name_amp):
+        """
+        This function modifies the elements of the status bar
+         to receive information from the NeoRec amplifier
+        :param name_amp: name class of amplifier str
+        """
+        self.amp = name_amp
+        self.labelStatus_4.setToolTip("Utilization BLE")
+        self.progressBarUtilization.setFormat("% Battery Level")
+        self.resetUtilization()
+
 
 """
 Log Entry Dialog
@@ -1086,6 +1151,27 @@ class DlgLogView(QDialog, frmLogView.Ui_frmLogView):
         self.labelView.setPlainText(entry)
 
 
+'''
+------------------------------------------------------------
+BATTERY INFO DIALOG
+------------------------------------------------------------
+'''
+
+
+class DlgBatteryInfo(QMessageBox):
+    """ Show disconnect info for 10s
+    """
+
+    def __init__(self, *args):
+        infoText = (u"Please disconnect actiCHamp from actiPOWER after you finished recording.\n" +
+                    u"Always attach actiPOWER to the charger when not in use to prevent damaging the accumulator.")
+        QMessageBox.__init__(self, QMessageBox.Icon.Information, "Disconnect Battery", infoText)
+        self.startTimer(10000)
+
+    def timerEvent(self, e):
+        self.done(0)
+
+
 NAME_APPLICATION = "PyCorderPlus"
 __version__ = "0.0.0"
 
@@ -1094,16 +1180,30 @@ def main(args):
     """
     Create and start up main application
     """
+    try:
+        res = MainWindow.RESTART
+        while res == MainWindow.RESTART:
 
-    res = MainWindow.RESTART
-    while res == MainWindow.RESTART:
-        app = QApplication(sys.argv)
-        win = MainWindow()
-        win.showMaximized()
-        res = app.exec()
+            app = QApplication(sys.argv)
+            win = MainWindow()
+            win.showMaximized()
+            res = app.exec()
 
-        del app
-        del win
+            if (
+                    res == MainWindow.RESTART and win.name_amplifier == AMP_NeoRec.__name__
+            ) or (
+                    res != MainWindow.RESTART and win.name_amplifier == AMP_ActiChamp.__name__
+            ):
+                # show the battery disconnection reminder for actiCHamp
+                DlgBatteryInfo().exec()
+
+            del app
+            del win
+    except Exception as e:
+        tb = GetExceptionTraceBack()[0]
+        QMessageBox.critical(None, "PyCorder", tb + " -> " + str(e))
+
+    print("PyCorder terminated")
 
 
 if __name__ == "__main__":

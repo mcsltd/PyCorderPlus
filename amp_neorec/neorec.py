@@ -735,7 +735,8 @@ class NeoRec:
         if self.lib is None:
             raise AmpError("library nb2mcs_x64.dll not available")
         if self.id == 0:
-            raise AmpError("device is not open")
+            connected = False
+            return 0, connected
 
         battery = t_nb2BatteryProperties()
         connected = True
