@@ -113,7 +113,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
     signal_close = pyqtSignal(str)
 
-
     RESTART = 1
 
     def __init__(self):
@@ -148,8 +147,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.log_dir = ""
         self.loadPreferences()
         self.recording_mode = -1
-
-        # self.usageConfirmed = False
 
         # create module chain (top = index 0, bottom = last index)
         self.defineModuleChain()
@@ -694,7 +691,6 @@ NeoRec amplifier search window
 
 
 class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog):
-
     signal_hide = pyqtSignal()
     signal_search = pyqtSignal(bool)
 
@@ -744,7 +740,6 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
                 self.close()
             elif result == QMessageBox.StandardButton.No:
                 event.ignore()
-
 
 
 '''
@@ -1138,7 +1133,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         self.resetUtilization()
 
 
-
 """
 Log Entry Dialog
 """
@@ -1157,6 +1151,27 @@ class DlgLogView(QDialog, frmLogView.Ui_frmLogView):
         self.labelView.setPlainText(entry)
 
 
+'''
+------------------------------------------------------------
+BATTERY INFO DIALOG
+------------------------------------------------------------
+'''
+
+
+class DlgBatteryInfo(QMessageBox):
+    """ Show disconnect info for 10s
+    """
+
+    def __init__(self, *args):
+        infoText = (u"Please disconnect actiCHamp from actiPOWER after you finished recording.\n" +
+                    u"Always attach actiPOWER to the charger when not in use to prevent damaging the accumulator.")
+        QMessageBox.__init__(self, QMessageBox.Icon.Information, "Disconnect Battery", infoText)
+        self.startTimer(10000)
+
+    def timerEvent(self, e):
+        self.done(0)
+
+
 NAME_APPLICATION = "PyCorderPlus"
 __version__ = "0.0.0"
 
@@ -1165,16 +1180,27 @@ def main(args):
     """
     Create and start up main application
     """
-
     res = MainWindow.RESTART
     while res == MainWindow.RESTART:
+
         app = QApplication(sys.argv)
         win = MainWindow()
         win.showMaximized()
         res = app.exec()
 
+
+        if (
+                res == MainWindow.RESTART and win.name_amplifier == AMP_NeoRec.__name__
+        ) or (
+                res != MainWindow.RESTART and win.name_amplifier == AMP_ActiChamp.__name__
+        ):
+            # show the battery disconnection reminder for actiCHamp
+            DlgBatteryInfo().exec()
+
         del app
         del win
+
+    print("PyCorder terminated")
 
 
 if __name__ == "__main__":
