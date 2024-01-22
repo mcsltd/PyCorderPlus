@@ -9,4 +9,12 @@
 ## Dependencies
 ### Requirements
 ## Copyrights
+### Main code base
+Copyright © 2010, Brain Products GmbH, Gilching, for original PyCorder modules
+
+Copyright © 2024, Medical Computer Systems Ltd, for modules rewritten to a new version of Python
+
+### PyCorderPlus NeoRec Recorder
+Copyright ©  2024, Medical Computer Systems Ltd, for modules for receiving and processing data from NeoRec amplifiers
+
 ## License

@@ -1,3 +1,16 @@
+"""
+Acquisition Module
+
+PyCorderPlus NeoRec Recorder
+
+------------------------------------------------------------
+
+Copyright (C) 2024, Medical Computer Systems Ltd
+
+
+This file is part of PyCorderPlus
+"""
+
 import time
 from operator import itemgetter
 

@@ -1,3 +1,17 @@
+"""
+Digital Filter Module
+
+PyCorderPlus ActiChamp Recorder
+
+------------------------------------------------------------
+
+Copyright (C) 2010, Brain Products GmbH, Gilching
+Copyright (C) 2024, Medical Computer Systems Ltd
+
+
+This file is part of PyCorderPlus
+"""
+
 from scipy import signal
 from modbase import *
 from operator import itemgetter

@@ -1,3 +1,17 @@
+"""
+Python wrapper for NeoRec Windows library
+
+ActiChamp_x86.dll (32-Bit) and ActiChamp_x64.dll (64-Bit)
+PyCorderPlus NeoRec Recorder
+
+------------------------------------------------------------
+
+Copyright (C) 2024, Medical Computer Systems Ltd
+
+
+This file is part of PyCorderPlus
+"""
+
 import ctypes
 import ctypes.wintypes
 import _ctypes

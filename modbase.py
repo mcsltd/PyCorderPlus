@@ -2,35 +2,17 @@
 """
 Base class for all recording modules
 
-PyCorder ActiChamp Recorder
+PyCorderPlus ActiChamp Recorder
 
 ------------------------------------------------------------
 
 Copyright (C) 2010, Brain Products GmbH, Gilching
+Copyright (C) 2024, Medical Computer Systems Ltd
 
-This file is part of PyCorder
 
-PyCorder is free software: you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 3
-of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with PyCorder. If not, see <http://www.gnu.org/licenses/>.
-
-------------------------------------------------------------
-
-@author: Norbert Hauser
-@date: $Date: 2013-06-10 12:20:40 +0200 (Mo, 10 Jun 2013) $
-@version: 1.0
-
-B{Revision:} $LastChangedRevision: 201 $
+This file is part of PyCorderPlus
 """
+
 import datetime
 import os
 import sys

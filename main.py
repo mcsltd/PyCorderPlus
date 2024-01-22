@@ -1,3 +1,25 @@
+"""
+Main Application
+
+PyCorderPlus ActiChamp and NeoRec Recorder
+
+------------------------------------------------------------
+
+Copyright (C) 2010, Brain Products GmbH, Gilching
+Copyright (C) 2024, Medical Computer Systems Ltd
+
+------------------------------------------------------------
+
+Available modules:
+ - Amplifiers: AMP_NeoRec, AMP_ActiChamp
+ - Mounting channels: MNT_Recording
+ - Trigger Input Detection: TRG_Eeg
+ - Data Storage: StorageVision
+ - Digital Filter: FLT_Eeg
+ - Impedance Display Dialog: IMP_Display
+ - Data Display Module: DISP_Scope
+"""
+
 import collections
 import re
 
