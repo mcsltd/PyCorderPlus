@@ -1180,25 +1180,28 @@ def main(args):
     """
     Create and start up main application
     """
-    res = MainWindow.RESTART
-    while res == MainWindow.RESTART:
+    try:
+        res = MainWindow.RESTART
+        while res == MainWindow.RESTART:
 
-        app = QApplication(sys.argv)
-        win = MainWindow()
-        win.showMaximized()
-        res = app.exec()
+            app = QApplication(sys.argv)
+            win = MainWindow()
+            win.showMaximized()
+            res = app.exec()
 
+            if (
+                    res == MainWindow.RESTART and win.name_amplifier == AMP_NeoRec.__name__
+            ) or (
+                    res != MainWindow.RESTART and win.name_amplifier == AMP_ActiChamp.__name__
+            ):
+                # show the battery disconnection reminder for actiCHamp
+                DlgBatteryInfo().exec()
 
-        if (
-                res == MainWindow.RESTART and win.name_amplifier == AMP_NeoRec.__name__
-        ) or (
-                res != MainWindow.RESTART and win.name_amplifier == AMP_ActiChamp.__name__
-        ):
-            # show the battery disconnection reminder for actiCHamp
-            DlgBatteryInfo().exec()
-
-        del app
-        del win
+            del app
+            del win
+    except Exception as e:
+        tb = GetExceptionTraceBack()[0]
+        QMessageBox.critical(None, "PyCorder", tb + " -> " + str(e))
 
     print("PyCorder terminated")
 
