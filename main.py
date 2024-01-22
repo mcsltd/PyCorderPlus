@@ -110,7 +110,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
     signal_parentevent = pyqtSignal("PyQt_PyObject")
     signal_check_bluetooth = pyqtSignal(bool)
     signal_search = pyqtSignal(bool)
+
     signal_close = pyqtSignal(str)
+
 
     RESTART = 1
 
@@ -171,13 +173,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         # get name class Amplifier, if current topmodule is NeoRec than begin search device
         if self.topmodule.__class__.__name__ == AMP_NeoRec.__name__:
             self.search = True
-
             # disabled button select NeoRec in Menu/View
             self.actionNeoRec.setDisabled(True)
-
             # activate search NeoRec
             self.signal_search.connect(self.search_neorec)
             self.signal_search.emit(self.search)
+            # adapt the status bar to NeoRec
+            self.statusWidget.adapt_statusBar(self.topmodule.__class__.__name__)
 
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
@@ -886,6 +888,9 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         self.labelInfo.setText("Medical Computer Systems Ltd, PyCorderPlus V" + __version__)
         self.labelStatus_4.setAutoFillBackground(True)
 
+        # name amplifier
+        self.amp = AMP_ActiChamp.__name__
+
         # log entries
         self.logFifo = collections.deque(maxlen=10000)
         self.lockError = False
@@ -906,7 +911,12 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         self.utilizationFifo = collections.deque()
         self.utilizationUpdateCounter = 0
         self.utilizationMaxValue = 0
-        self.updateUtilization(0)
+
+        if self.amp == AMP_ActiChamp.__name__:
+            self.updateUtilization(0)
+
+        if self.amp == AMP_NeoRec.__name__:
+            self.progressBarUtilization.setFormat("%v% Battery")
 
     def updateUtilization(self, utilization):
         """
@@ -1066,6 +1076,18 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         palette = self.labelInfo.palette()
         palette.setColor(self.labelInfo.backgroundRole(), self.defaultBkColor)
         self.labelInfo.setPalette(palette)
+
+    def adapt_statusBar(self, name_amp):
+        """
+        This function modifies the elements of the status bar
+         to receive information from the NeoRec amplifier
+        :param name_amp: name class of amplifier str
+        """
+        self.amp = name_amp
+        self.labelStatus_4.setToolTip("Utilization BLE")
+        # self.progressBarUtilization.setFormat("%v% Battery")
+        self.progressBarUtilization.setFormat("%v% Battery")
+
 
 
 """
