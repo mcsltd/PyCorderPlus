@@ -916,7 +916,7 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
             self.updateUtilization(0)
 
         if self.amp == AMP_NeoRec.__name__:
-            self.progressBarUtilization.setFormat("%v% Battery")
+            self.updateBatteryLevel(0)
 
     def updateUtilization(self, utilization):
         """
@@ -976,6 +976,48 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
             """)
             pass
 
+    def updateBatteryLevel(self, level):
+        """
+        Update battery level in progress bar (only NeoRec)
+        :param level: int
+        """
+        # update progress bar
+        if level < 100:
+            self.progressBarUtilization.setValue(int(level))
+        else:
+            self.progressBarUtilization.setValue(100)
+        self.progressBarUtilization.setFormat(f"{level}% Battery Level")
+
+        # modify progress bar color (>5% -> green, <=5% -> red)
+        if level > 5:
+            self.progressBarUtilization.setStyleSheet("""
+                        QProgressBar {
+                            padding: 1px;
+                            text-align: right;
+                            margin-right: 17ex;
+                        }
+
+                        QProgressBar::chunk {
+                            background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 lime, stop: 0 white);
+                            margin: 0.5px;
+                        }
+                    """)
+            pass
+        else:
+            self.progressBarUtilization.setStyleSheet("""
+                        QProgressBar {
+                            padding: 1px;
+                            text-align: right;
+                            margin-right: 17ex;
+                        }
+
+                        QProgressBar::chunk {
+                            background: qlineargradient(x1: 1, y1: 0, x2: 1, y2: 0.5, stop: 1 red, stop: 0 white);
+                            margin: 0.5px;
+                        }
+                    """)
+            pass
+
     def updateEventStatus(self, event):
         """
         Update status info field and put events into the log fifo
@@ -1012,8 +1054,10 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
                 else:
                     palette.setColor(self.labelStatus_4.backgroundRole(), self.defaultBkColor)
                 self.labelStatus_4.setPalette(palette)
-            elif event.status_field == "Utilization":
+            elif event.status_field == "Utilization" and self.amp == AMP_ActiChamp.__name__:
                 self.updateUtilization(event.info)
+            elif event.status_field == "BatteryNeoRec" and self.amp == AMP_NeoRec.__name__:
+                self.updateBatteryLevel(event.info)
             return
 
         # lock an error display until LogView is shown
@@ -1085,8 +1129,8 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         """
         self.amp = name_amp
         self.labelStatus_4.setToolTip("Utilization BLE")
-        # self.progressBarUtilization.setFormat("%v% Battery")
-        self.progressBarUtilization.setFormat("%v% Battery")
+        self.progressBarUtilization.setFormat("% Battery Level")
+        self.resetUtilization()
 
 
 

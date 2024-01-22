@@ -436,14 +436,13 @@ class AMP_NeoRec(ModuleBase):
             severe = ErrorSeverity.STOP
 
         # create and send status message
-        level_info = f"{level} %"
         self.send_event(
             ModuleEvent(
                 self._object_name,
                 EventType.STATUS,
-                info=level_info,
+                info=int(level),
                 severity=severe,
-                status_field="Battery"
+                status_field="BatteryNeoRec"
             )
         )
         return severe < ErrorSeverity.STOP, level
