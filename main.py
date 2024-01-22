@@ -917,6 +917,7 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
 
         if self.amp == AMP_NeoRec.__name__:
             self.updateBatteryLevel(0)
+            self.labelStatus_4.setText(f"BLE: 0%")
 
     def updateUtilization(self, utilization):
         """
@@ -1058,6 +1059,10 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
                 self.updateUtilization(event.info)
             elif event.status_field == "BatteryNeoRec" and self.amp == AMP_NeoRec.__name__:
                 self.updateBatteryLevel(event.info)
+                # add process severity
+            elif event.status_field == "BLEUtilization":
+                self.labelStatus_4.setText(f"BLE: {event.info}%")
+
             return
 
         # lock an error display until LogView is shown

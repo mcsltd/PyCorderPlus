@@ -368,6 +368,8 @@ class AMP_NeoRec(ModuleBase):
                 )
             )
             raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
+        # check and set ble
+        self._check_ble()
 
         # check battery
         ok, level = self._check_battery()
@@ -450,6 +452,17 @@ class AMP_NeoRec(ModuleBase):
     def _check_ble(self):
         # read amplifier ble utilization level
         ble = self.amp.getDeviceStatus()[0]
+
+        # create and send status message
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.STATUS,
+                info=int(ble),
+                status_field="BLEUtilization"
+            )
+        )
+
         pass
 
     def process_output(self):
@@ -462,9 +475,9 @@ class AMP_NeoRec(ModuleBase):
         self.eeg_data.performance_timer_max = 0
         self.recordtime = 0.0
 
-        # check level battery voltage and BLE utilization level every 5s
-        if (t - self.battery_timer) > 5.0 or self.battery_timer == 0:
-            # self._check_ble()
+        # check level battery voltage and BLE utilization level every 1s
+        if (t - self.battery_timer) > 1.0 or self.battery_timer == 0:
+            self._check_ble()
             self._check_battery()
             self.battery_timer = t
 
