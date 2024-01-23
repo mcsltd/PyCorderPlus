@@ -302,6 +302,7 @@ class EEG_DataBlock:
         ''' Get an property array with default settings
         @param eeg: number of EEG channels
         @param aux: number of AUX channels
+        :param eeg_ch_names: names of EEG channels (only NeoRec)
         '''
         channel_properties = []
         for c in range(0, eeg):

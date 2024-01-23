@@ -397,7 +397,7 @@ class NeoRec:
     def getDeviceInformation(self):
         """
         Getting information about a connected device
-        :return: Serial Number, Model
+        :return: Model, Serial Number
         """
         if self.lib is None:
             raise AmpError("library nb2mcs.dll not available")
