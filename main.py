@@ -61,18 +61,6 @@ def InstantiateModules(name_amp):
     Additional modules can be connected left -> right with tuples as list objects.
     @return: list with instantiated module objects
     """
-    # test modules for control amplifier
-    # modules = [
-    #     # AMP_ActiChamp(),
-    #     AMP_NeoRec(),
-    #     # MNT_Recording(),
-    #     # TRG_Eeg(),
-    #     # StorageVision(),
-    #     # FLT_Eeg(),
-    #     # IMP_Display(),
-    #     DISP_Scope(instance=0),
-    #     # Receiver()
-    # ]
     modules = []
 
     if name_amp == AMP_ActiChamp.__name__:
@@ -84,7 +72,6 @@ def InstantiateModules(name_amp):
             FLT_Eeg(),
             IMP_Display(),
             DISP_Scope(instance=0),
-            # Receiver()
         ]
     elif name_amp == AMP_NeoRec.__name__:
         modules = [
@@ -95,7 +82,6 @@ def InstantiateModules(name_amp):
             FLT_Eeg(),
             IMP_Display(),
             DISP_Scope(instance=0),
-            # Receiver()
         ]
 
     return modules

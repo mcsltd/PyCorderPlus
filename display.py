@@ -126,7 +126,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.default_group_size = 16
 
         # set default display
-        self.eeg = EEG_DataBlock()
+        self.eeg = EEG_DataBlock(eeg=0, aux=0)
         self.process_update(self.eeg)
 
         # timing test
@@ -134,7 +134,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.tcount = 10.0
 
         # start self.timerEvent() to update display asynchronously
-        self.startTimer(30)
+        # self.startTimer(100)
         self.update_display = False
         self.dataavailable = False
 

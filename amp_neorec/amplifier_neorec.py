@@ -99,6 +99,16 @@ class AMP_NeoRec(ModuleBase):
         self.acquisitionTimeoutCounter = 0
         self.test_counter = 0
 
+        # send an event to the storage module to change the amplifier name
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info="NeoRec",
+                status_field="ChangeAmp"
+            )
+        )
+
     def get_online_configuration(self):
         """ Get the online configuration pane
         """
@@ -690,9 +700,13 @@ class AMP_NeoRec(ModuleBase):
         :return:
         """
         # set device information (serial number, model)
-        self.model, self.sn = self.amp.getDeviceInformation()
+        model, self.sn = self.amp.getDeviceInformation()
 
-        if self.model is not None:
+        if model is None or model != self.model:
+
+            self.model = model
+            self.max_eeg_channels = self.amp.CountEeg
+
             # reset settings for Montage to display channel names
             self.send_event(
                 ModuleEvent(
@@ -701,6 +715,7 @@ class AMP_NeoRec(ModuleBase):
                     status_field="setDefault"
                 )
             )
+
             self.setDefault()
 
             # send an event to display to adapt the possible number of channels
@@ -710,16 +725,6 @@ class AMP_NeoRec(ModuleBase):
                     EventType.COMMAND,
                     info=self.amp.CountEeg,
                     status_field="ChangedChannelCount"
-                )
-            )
-
-            # send an event to the storage module to change the amplifier name
-            self.send_event(
-                ModuleEvent(
-                    self._object_name,
-                    EventType.COMMAND,
-                    info=NR_Models[self.model],
-                    status_field="ChangeAmp"
                 )
             )
 
