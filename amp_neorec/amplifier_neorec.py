@@ -477,7 +477,6 @@ class AMP_NeoRec(ModuleBase):
                 status_field="BLEUtilization"
             )
         )
-
         pass
 
     def process_output(self):
