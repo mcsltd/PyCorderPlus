@@ -15,7 +15,8 @@ PyCorderPlus supports the following amplifiers:
 2. Real-time EEG display
 2. Real-time impedance display
 3. EEG filtering
-4. Save the EEG in the format `.eeg` ([Brain Products format](https://www.brainproducts.com/support-resources/brainvision-core-data-format-1-0/))
+4. Montage of channels
+5. Save the EEG in the format `.eeg` ([Brain Products format](https://www.brainproducts.com/support-resources/brainvision-core-data-format-1-0/))
 
 
 ## Installation
@@ -25,6 +26,7 @@ PyCorderPlus supports the following amplifiers:
 2. In command line open directory with code of `PyCorderPlus`
 3. Run in command line `install.bat`
 
+Example:
 ```commandline
 C:\User\Name\PyCorderPlus> install.bat
 ```
@@ -33,6 +35,8 @@ C:\User\Name\PyCorderPlus> install.bat
 
 1. In command line open directory with code of `PyCorderPlus`
 2. Run `run.bat`
+
+Example:
 ```commandline
 C:\User\Name\PyCorderPlus> run.bat
 ```
