@@ -50,14 +50,14 @@ If you are opening `PyCorderPlus` for the first time, then you need to install t
 ### Amplifier Drivers
 
 * Driver for [actiCHamp Plus](actiCHampDriver)
-* Driver for [NeoRec amplifiers](NeoRecDriver)
+* To work with NeoRec amplifiers, you do not need to install drivers, the amplifiers work via Bluetooth
 
 
 ### Requirements
 * Python >= 3.11
 
 ### System requirements
-* OS: Windows
+* OS: Windows 10
 
 ### Requirements for libraries
 You can find other requirements for the library in the [requirements.txt](requirements.txt).
