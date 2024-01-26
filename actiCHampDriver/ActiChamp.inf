@@ -1,0 +1,126 @@
+;--------------------------------------------------------------------;
+;
+; ActiChamp
+;
+; INF file for Windows Windows 7, Vista, XP (32-bit and 64-bit)
+;
+; Copyright (c) Brain Products GmbH, 2011
+;
+;--------------------------------------------------------------------;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class = BrainProductsClass
+ClassGUID = {49DB6ABA-9926-4332-82A9-8205C8CBDF93}
+Provider = %Provider.Desc%
+CatalogFile = ActiChamp.cat
+DriverVer = 01/19/2011,3.4.5.0
+DriverPackageDisplayName=%DriverPackage.Desc%
+
+;--------------------------------------------------------------------;
+
+[ClassInstall32]
+AddReg = Class.AddReg 
+CopyFiles = Class.CopyFiles
+
+[Class.AddReg]
+HKR,,,,%ClassName%
+HKR,,EnumPropPages32,,"DiBpGmbH.dll,BrainProductsPropPageProvider"
+HKR,,Icon,,2
+
+[Class.CopyFiles]
+DiBpGmbH.dll
+
+;--------------------------------------------------------------------;
+
+[SourceDisksFiles]
+DiBpGmbH.dll = 1,,
+CyUsb.sys.XP = 1,,
+CyUsb.sys.Vista = 1,,
+
+[SourceDisksNames]
+1=,,,\x86
+
+[SourceDisksNames.amd64]
+1=,,,\x64
+
+[DestinationDirs]
+Class.CopyFiles = 11
+ActiChamp.XP.CopyFiles = 10,System32\Drivers
+ActiChamp.Vista.CopyFiles = 10,System32\Drivers
+
+;--------------------------------------------------------------------;
+
+[Manufacturer]
+%Manufacturer.Desc% = ActiChamp, NTx86.5.1, NTamd64.5.1, NTx86.6.0, NTamd64.6.0
+
+;--------------------------------------------------------------------;
+
+; XP 32-bit and later
+[ActiChamp.NTx86.5.1]
+%Dev.DeviceDesc.1103.0010% = ActiChamp.XP, USB\VID_1103&PID_0010
+
+; XP 64-bit and later
+[ActiChamp.NTamd64.5.1]
+%Dev.DeviceDesc.1103.0010% = ActiChamp.XP, USB\VID_1103&PID_0010
+
+; Vista 32-bit and later
+[ActiChamp.NTx86.6.0]
+%Dev.DeviceDesc.1103.0010% = ActiChamp.Vista, USB\VID_1103&PID_0010
+
+; Vista 64-bit and later
+[ActiChamp.NTamd64.6.0]
+%Dev.DeviceDesc.1103.0010% = ActiChamp.Vista, USB\VID_1103&PID_0010
+
+;--------------------------------------------------------------------;
+
+[ActiChamp.XP.NT]
+CopyFiles = ActiChamp.XP.CopyFiles
+
+[ActiChamp.XP.NT.HW]
+AddReg = ActiChamp.Common.AddReg
+
+[ActiChamp.XP.NT.Services]
+AddService = %Device.Dev.Service%, 0x2, ActiChamp.Common.AddService
+
+[ActiChamp.XP.CopyFiles]
+CyUsb.sys, CyUsb.sys.XP
+
+;--------------------------------------------------------------------;
+
+[ActiChamp.Vista.NT]
+CopyFiles = ActiChamp.Vista.CopyFiles
+
+[ActiChamp.Vista.NT.HW]
+AddReg = ActiChamp.Common.AddReg
+
+[ActiChamp.Vista.NT.Services]
+AddService = %Device.Dev.Service%, 0x2, ActiChamp.Common.AddService
+
+[ActiChamp.Vista.CopyFiles]
+CyUsb.sys, CyUsb.sys.Vista
+
+;--------------------------------------------------------------------;
+
+[ActiChamp.Common.AddService]
+ServiceType    = 1 ; SERVICE_KERNEL_DRIVER
+StartType      = 3 ; SERVICE_DEMAND_START
+ErrorControl   = 1 ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\CyUsb.sys
+
+[ActiChamp.Common.AddReg]
+HKR,,DriverGUID,,%Device.Drv.GUID%
+
+;--------------------------------------------------------------------;
+
+[Strings]
+Provider.Desc = "Brain Products GmbH"
+DriverPackage.Desc="ActiChamp Driver for Brain Products GmbH"
+ClassName = "Brain Products neurophysiological devices"
+Manufacturer.Desc = "Brain Products GmbH"
+Dev.DeviceDesc.1103.0010 = "ActiChamp EEG amplifier"                                              	
+Device.Drv.GUID="{AE18AA60-7F6A-11d4-97DD-00010229B959}"
+Device.Dev.Service="ActiChamp"
+
+;--------------------------------------------------------------------;
+	
