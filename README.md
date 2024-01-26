@@ -57,7 +57,7 @@ If you are opening `PyCorderPlus` for the first time, then you need to install t
 * Python >= 3.11
 
 ### System requirements
-* OS: Windows
+* OS: Windows 10
 
 ### Requirements for libraries
 You can find other requirements for the library in the [requirements.txt](requirements.txt).
