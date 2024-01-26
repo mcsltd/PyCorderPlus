@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Generic Model/View Table
 
@@ -97,7 +98,6 @@ class GenericTableWidget(QTableView):
                     self.data_model._setitem(r, cc, val)
 
         # notify parent about changes
-        # self.emit(Qt.SIGNAL('dataChanged()'))
         self.dataChanged.emit()
 
     def _selectionChanged(self, selected, deselected):

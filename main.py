@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Main Application
 
@@ -42,8 +43,8 @@ from res import frmLogView
 """
 Import and instantiate recording modules.
 """
-from modbase import *
 
+from modbase import *
 from amp_actichamp.amplifier_actichamp import AMP_ActiChamp
 from amp_neorec.amplifier_neorec import AMP_NeoRec
 from montage import MNT_Recording
@@ -53,26 +54,16 @@ from storage import StorageVision
 from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
+NAME_APPLICATION = "PyCorderPlus"
+__version__ = "1.0.0"
+
 
 def InstantiateModules(name_amp):
     """
     Instantiate and arrange module objects.
     Modules will be connected top -> down, starting with array index 0.
-    Additional modules can be connected left -> right with tuples as list objects.
     @return: list with instantiated module objects
     """
-    # test modules for control amplifier
-    # modules = [
-    #     # AMP_ActiChamp(),
-    #     AMP_NeoRec(),
-    #     # MNT_Recording(),
-    #     # TRG_Eeg(),
-    #     # StorageVision(),
-    #     # FLT_Eeg(),
-    #     # IMP_Display(),
-    #     DISP_Scope(instance=0),
-    #     # Receiver()
-    # ]
     modules = []
 
     if name_amp == AMP_ActiChamp.__name__:
@@ -84,7 +75,6 @@ def InstantiateModules(name_amp):
             FLT_Eeg(),
             IMP_Display(),
             DISP_Scope(instance=0),
-            # Receiver()
         ]
     elif name_amp == AMP_NeoRec.__name__:
         modules = [
@@ -95,7 +85,6 @@ def InstantiateModules(name_amp):
             FLT_Eeg(),
             IMP_Display(),
             DISP_Scope(instance=0),
-            # Receiver()
         ]
 
     return modules
@@ -546,7 +535,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 f.close()
             except Exception as e:
                 tb = GetExceptionTraceBack()[0]
-                QMessageBox.critical(None, "PyCorder",
+                QMessageBox.critical(None, "PyCorderPlus",
                                      "Failed to write log file (%s)\n" % file_name +
                                      tb + " -> " + str(e))
 
@@ -626,9 +615,6 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             # clean up modules
             for module in flatten(self.modules):
                 module.terminate()
-            # terminate remote control server
-            # if self.RC != None:
-            #     self.RC.terminate()
             event.accept()
 
     def sendEvent(self, event):
@@ -743,9 +729,7 @@ class DlgConnectionNeoRec(frmDlgNeoRecConnection.Ui_DlgNeoRecConnection, QDialog
 
 
 '''
-------------------------------------------------------------
-MAIN CONFIGURATION DIALOG
-------------------------------------------------------------
+Main configuration dialog.
 '''
 
 
@@ -918,7 +902,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         """
         Update the utilization progressbar
         :param utilization: percentage of utilization
-        :return:
         """
         # average utilization value
         self.utilizationFifo.append(utilization)
@@ -975,7 +958,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
     def updateBatteryLevel(self, level):
         """
         Update battery level in progress bar (only NeoRec)
-        :param level: int
         """
         # update progress bar
         if level < 100:
@@ -1018,7 +1000,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         """
         Update status info field and put events into the log fifo
         :param event: ModuleEvent object
-        :return:
         """
         # display dedicated status info values
         if event.type == EventType.STATUS:
@@ -1057,7 +1038,6 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
                 # add process severity
             elif event.status_field == "BLEUtilization":
                 self.labelStatus_4.setText(f"BLE: {event.info}%")
-
             return
 
         # lock an error display until LogView is shown
@@ -1106,14 +1086,12 @@ class StatusBarWidget(QWidget, frmMainStatusBar.Ui_frmStatusBar):
         Mouse click into info label
         Show the event log content
         :param mouse_event:
-        :return:
         """
         self.signal_showLog.emit()
 
     def resetErrorState(self):
         """
         Reset error lock and info display
-        :return:
         """
         self.lockError = False
         self.labelInfo.setText("")
@@ -1152,9 +1130,7 @@ class DlgLogView(QDialog, frmLogView.Ui_frmLogView):
 
 
 '''
-------------------------------------------------------------
-BATTERY INFO DIALOG
-------------------------------------------------------------
+Battery info dialog
 '''
 
 
@@ -1172,14 +1148,11 @@ class DlgBatteryInfo(QMessageBox):
         self.done(0)
 
 
-NAME_APPLICATION = "PyCorderPlus"
-__version__ = "0.0.0"
-
-
 def main(args):
     """
     Create and start up main application
     """
+    print("Starting PyCorderPlus, please wait ...")
     try:
         res = MainWindow.RESTART
         while res == MainWindow.RESTART:
@@ -1201,9 +1174,9 @@ def main(args):
             del win
     except Exception as e:
         tb = GetExceptionTraceBack()[0]
-        QMessageBox.critical(None, "PyCorder", tb + " -> " + str(e))
+        QMessageBox.critical(None, "PyCorderPlus", tb + " -> " + str(e))
 
-    print("PyCorder terminated")
+    print("PyCorderPlus terminated")
 
 
 if __name__ == "__main__":

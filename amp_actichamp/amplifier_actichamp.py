@@ -88,15 +88,7 @@ class AMP_ActiChamp(ModuleBase):
         self.binningoffset = 0
 
         # set default data block
-        if AMP_MONTAGE:
-            # ToDo: self._create_channel_selection()
-            pass
-        else:
-            self._create_all_channel_selection()
-
-        # ToDo: make the input device container
-        # create the input device container
-        # self.inputDevices = DeviceContainer()
+        self._create_all_channel_selection()
 
         # date and time of acquisition start
         self.start_time = datetime.datetime.now()
@@ -128,9 +120,9 @@ class AMP_ActiChamp(ModuleBase):
         return self.online_cfg
 
     def get_configuration_pane(self):
-        ''' Get the configuration pane if available.
+        """ Get the configuration pane if available.
         Qt widgets are not reusable, so we have to create it every time
-        '''
+        """
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         # read amplifier configuration
         self.amp.readConfiguration(self.sample_rate['base'], force=True)
@@ -255,8 +247,8 @@ class AMP_ActiChamp(ModuleBase):
             self.eeg_data.eeg_channels[self.eeg_indices, ImpedanceIndex.GND] = 1
 
     def setDefault(self):
-        ''' Set all module parameters to default values
-        '''
+        """ Set all module parameters to default values
+        """
         emulation_mode = self.amp.getEmulationMode() > 0
         self.sample_rate = self.sample_rates[7]  # 500Hz sample rate
         for channel in self.channel_config:
@@ -662,11 +654,6 @@ class AMP_ActiChamp(ModuleBase):
         self.eeg_data.trigger_channel = np.zeros((1, 10), np.uint32)
         self.eeg_data.sample_channel = np.zeros((1, 10), np.uint32)
 
-        # process connected input devices
-        if not AMP_MONTAGE:
-            # self.inputDevices.process_input(self.eeg_data)
-            pass
-
         # set recording time
         self.eeg_data.block_time = datetime.datetime.now()
 
@@ -748,9 +735,6 @@ class AMP_ActiChamp(ModuleBase):
             for channel in self.channel_config:
                 channels.append(channel.getXML())
 
-        # input device container
-        # devices = E.InputDeviceContainer(self.inputDevices.getXML())
-
         amplifier = E.AMP_ActiChamp(E.samplerate(self.sample_rate['value']),
                                     E.pllexternal(self.amp.PllExternal),
                                     channels,
@@ -797,13 +781,6 @@ class AMP_ActiChamp(ModuleBase):
                 if rate["value"] >= sr:
                     self.sample_rate = rate
                     break
-            if version >= 2:
-                # setup the input device configuration
-                # self.inputDevices.setXML(cfg.InputDeviceContainer)
-                pass
-            else:
-                # self.inputDevices.reset()
-                pass
             if version >= 3:
                 self.amp.PllExternal = cfg.pllexternal.pyval
             else:
@@ -819,14 +796,14 @@ Amplifier module online GUI.
 
 
 class _OnlineCfgPane(QFrame, frmActiChampOnline.Ui_frmActiChampOnline):
-    ''' ActiChamp online configuration pane
-    '''
+    """ ActiChamp online configuration pane
+    """
     modeChanged = pyqtSignal(int)
 
     def __init__(self, amp, *args):
-        ''' Constructor
+        """ Constructor
         @param amp: parent module object
-        '''
+        """
         super().__init__()
         self.setupUi(self)
         self.amp = amp
@@ -895,7 +872,6 @@ class _DeviceConfigurationPane(QFrame):
     dataChanged = pyqtSignal()
 
     def __init__(self, amplifier, *args):
-        # apply(Qt.QFrame.__init__, (self,) + args)
         super().__init__()
 
         # reference to our parent module
@@ -962,23 +938,12 @@ class _DeviceConfigurationPane(QFrame):
 
         self.groupAmplifier.setLayout(self.gridLayoutAmpGroup)
 
-        # get the device configuration widget
-        # self.device_cfg = self.amplifier.inputDevices.get_configuration_widget()
-
-        # group device elements
-        # self.groupDevices = QGroupBox("Optional Input Devices")
-        # self.gridLayoutDeviceGroup = QGridLayout()
-        # # self.gridLayoutDeviceGroup.addWidget(self.device_cfg, 0, 0)
-        # self.groupDevices.setLayout(self.gridLayoutDeviceGroup)
-
         # add all items to the main layout
         self.gridLayout.addWidget(self.groupAmplifier, 0, 0)
-        # self.gridLayout.addWidget(self.groupDevices, 1, 0)
 
         # actions
         self.comboBoxSampleRate.currentIndexChanged.connect(self._samplerate_changed)
         self.comboBoxEmulation.currentIndexChanged.connect(self._emulationChanged)
-        # ToDo: self.connect(self.amplifier.inputDevices, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
 
         # emulation combobox
         self.comboBoxEmulation.addItems(["off", "1", "2", "3", "4", "5"])
@@ -1048,61 +1013,3 @@ class _DeviceConfigurationPane(QFrame):
         else:
             self.amplifier.amp.PllExternal = 0
 
-
-class Receiver(ModuleBase):
-    def __init__(self, **kwargs):
-        super().__init__(usethread=False, queuesize=20, name="Receiver", instance=0)
-
-    def get_data(self):
-
-        if not self._input_queue.empty():
-            print(self._input_queue.get())
-            return self._input_queue.get()
-        else:
-            return None
-
-
-def example():
-    obj_1 = AMP_ActiChamp()
-    obj_2 = Receiver()
-
-    obj_1.add_receiver(obj_2)
-
-    obj_1.start()
-
-    d = obj_2.get_data()
-    while d is None:
-        d = obj_2.get_data()
-        print(d)
-
-    obj_1.stop()
-    obj_1.amp.close()
-
-
-if __name__ == "__main__":
-    example()
-
-    # amp = AMP_ActiChamp()
-    # # amp.amp.BlockingMode = False
-    # amp.setDefault()
-    # amp.process_start()
-    #
-    # for i in range(10):
-    #     time.sleep(1)
-    #     print(amp.amp.read(
-    #         indices=np.array([0, 1]),
-    #         eegcount=2,
-    #         auxcount=0
-    #     ))
-    #
-    # amp.stop()
-
-    # amp.setDefault()
-    # amp.process_start()
-    #
-    # for i in range(4):
-    #     time.sleep(1)
-    #     print(amp.process_output())
-    #
-    # amp.process_stop()
-    # amp.start()

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Display Module
 
@@ -63,14 +64,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.online_cfg.checkBoxBaseline.stateChanged.connect(self.baselineNowClicked)
 
         # legend
-        # legend = _ScopeLegend()
-        # legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        # legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
-        # self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
-
-        self.insertLegend(Qwt.QwtLegend(), Qwt.QwtPlot.LeftLegend)
-        self.legend().setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
-        self.legend().setDefaultItemMode(Qwt.QwtLegendData.Clickable)
+        legend = _ScopeLegend()
+        legend.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
+        legend.setDefaultItemMode(Qwt.QwtLegend.clicked)
+        self.insertLegend(legend, Qwt.QwtPlot.LeftLegend)
         self.legend().clicked.connect(self.channelItemClicked)
 
         # grid
@@ -99,9 +96,9 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.setAxisMaxMinor(Qwt.QwtPlot.yLeft, 0)
         self.enableAxis(Qwt.QwtPlot.yLeft, False)
 
-        self.plotscale = qwt.scale_widget.QwtScaleWidget()
-        self.plotscale.setAlignment(qwt.QwtScaleDraw.RightScale)
-        self.plotscale.setBorderDist(5, 0)
+        # self.plotscale = qwt.scale_widget.QwtScaleWidget()
+        # self.plotscale.setAlignment(qwt.QwtScaleDraw.RightScale)
+        # self.plotscale.setBorderDist(5, 0)
         # self.plotscale.attach(self)
 
         # reset trace buffer
@@ -118,8 +115,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         # default settings
         self.setScale(self.online_cfg.get_scale())  # µV / Division
         self.timebase = self.online_cfg.get_timebase()  # s  / Screen
-        # self.timebase = 0.1
-        # self.setScale(0.5)
 
         self.xsize = 1500
         self.binning = 300
@@ -343,17 +338,10 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             title.setColor(color)
             title.setPaintAttribute(Qwt.QwtText.PaintUsingTextFont)
             pc = Qwt.QwtPlotCurve(title)
-            # pc = Qwt.QwtPlotCurve()
             pc.setPen(QPen(color, 0))
             pc.setYAxis(Qwt.QwtPlot.yLeft)
-            # pc.setCurveAttribute(Qwt.QwtPlotCurve.PaintFiltered)
             pc.attach(self)
             self.traces.append(pc)
-
-
-        # # reduce the legend items margin
-        # for item in self.legend():
-        #     item.setMargin(0)
 
         # update Y axis scale
         self.setAxisScale(Qwt.QwtPlot.yLeft, -1.0, len(self.traces), 1.0)
@@ -484,7 +472,7 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         self.scale = scale
         ticks = list(np.arange(0.0, scale * 11.0, scale))
         yScaleDiv = Qwt.QwtScaleDiv(0.0, scale * 10.0, [], ticks, [])
-        self.plotscale.setScaleDiv(yScaleDiv)
+        # self.plotscale.setScaleDiv(yScaleDiv)
         self.replot()
 
     def onlineCfgChanged(self):
@@ -550,7 +538,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
         """
         SIGNAL Channel legend clicked
         """
-
         if self.selectedChannel == plotitem.title().text():
             self.selectedChannel = None
         else:
@@ -662,25 +649,25 @@ class _ScopeLegend(Qwt.QwtLegend):
         sz.setWidth(width)
         return sz
 
-    def layoutContents(self):
-        topMargin = self.parent().layout().canvasMargin(Qwt.QwtPlot.xTop)
-        bottomMargin = self.parent().layout().canvasMargin(Qwt.QwtPlot.xBottom)
-        viewport = self.contentsWidget().parentWidget()
-        visibleSize = viewport.size()
-        items = self.legendItems()
-        itemspace = float(visibleSize.height() - (topMargin + bottomMargin)) / (self.itemCount() + 1)
-        offset = itemspace * 0.8 - itemspace * 0.5 + topMargin
-        yBottom = 0
-        for idx, item in enumerate(items):
-            yTop = (idx + 1) * itemspace
-            itemHeight = int(yTop - yBottom)
-            item.setFixedHeight(itemHeight)
-            yBottom += itemHeight
-        layout = self.contentsWidget().layout()
-        layout.setGeometry(QRect(QPoint(0, offset),
-                                 QPoint(visibleSize.width(), visibleSize.height() - 2 * offset)))
-        self.contentsWidget().resize(visibleSize.width(), visibleSize.height())
-        return
+    # def layoutContents(self):
+    #     topMargin = self.parent().layout().canvasMargin(Qwt.QwtPlot.xTop)
+    #     bottomMargin = self.parent().layout().canvasMargin(Qwt.QwtPlot.xBottom)
+    #     viewport = self.contentsWidget().parentWidget()
+    #     visibleSize = viewport.size()
+    #     items = self.legendItems()
+    #     itemspace = float(visibleSize.height() - (topMargin + bottomMargin)) / (self.itemCount() + 1)
+    #     offset = itemspace * 0.8 - itemspace * 0.5 + topMargin
+    #     yBottom = 0
+    #     for idx, item in enumerate(items):
+    #         yTop = (idx + 1) * itemspace
+    #         itemHeight = int(yTop - yBottom)
+    #         item.setFixedHeight(itemHeight)
+    #         yBottom += itemHeight
+    #     layout = self.contentsWidget().layout()
+    #     layout.setGeometry(QRect(QPoint(0, offset),
+    #                              QPoint(visibleSize.width(), visibleSize.height() - 2 * offset)))
+    #     self.contentsWidget().resize(visibleSize.width(), visibleSize.height())
+    #     return
 
 
 class _TimeScaleDraw(Qwt.QwtScaleDraw):
@@ -861,7 +848,6 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
     def _isEegGroup(self):
         """ Get info about current selected channel group
         """
-        # ToDo: rewrite
         if not (ChannelGroup.EEG in self.group_slices):
             return False
         channel_slice = self.comboBoxChannels.itemData(self.comboBoxChannels.currentIndex())
@@ -879,7 +865,6 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         itemlist = []
         for i in range(cb.count()):
             if isdata:
-                # ToDo check: val = cb.itemData(i).toPyObject()
                 val = cb.itemData(i)
             else:
                 val = float(cb.itemText(i))
@@ -895,7 +880,6 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         """ Get current selected scale value from combobox
         @return: float scale
         """
-        # ToDo check: scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex()).toPyObject()
         scale = self.comboBoxScale.itemData(self.comboBoxScale.currentIndex())
         return scale
 
@@ -956,12 +940,3 @@ class _OnlineCfgPane(QFrame, frmScopeOnline.Ui_frmScopeOnline):
         # create channel groups
         self._slice_channels()
 
-
-if __name__ == "__main__":
-    import sys
-
-    app = QApplication(sys.argv)
-    obj = DISP_Scope()
-    print(vars(obj))
-    obj.show()
-    app.exec()

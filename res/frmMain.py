@@ -120,7 +120,7 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "PyCorderPlus"))
         self.pushButtonConfiguration.setText(_translate("MainWindow", "Configuration ..."))
         self.menuApplication.setTitle(_translate("MainWindow", "File"))
-        self.menuEdit.setTitle(_translate("MainWindow", "View"))
+        self.menuEdit.setTitle(_translate("MainWindow", "Amplifiers"))
         self.menuSelect_Amplifier.setTitle(_translate("MainWindow", "Select Amplifier"))
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionShow_Log.setText(_translate("MainWindow", "Show Log"))

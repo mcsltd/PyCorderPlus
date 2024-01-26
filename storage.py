@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Storage Module for Vision EEG file format
 
@@ -409,7 +410,6 @@ class StorageVision(ModuleBase):
             # create EEG header file
             try:
                 self.header_file = open(headername, "w")
-                # ToDo: add data from which device the data is being recorded
                 h = "Brain Vision Data Exchange Header File Version 1.0" + crlf
                 h += f"; Data created by the {self.name_device} PyCorderPlus" + crlf + crlf
 

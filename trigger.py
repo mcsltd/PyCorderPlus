@@ -28,7 +28,6 @@ class TRG_Eeg(ModuleBase):
         self.dataavailable = False
 
         # Trigger events
-
         self.lastevent = [[] for i in range(3)]  #: last values of trigger data block
         self.debouncing_delay = 2  #: debouncing value (number of samples)
 

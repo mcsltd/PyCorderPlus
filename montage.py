@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Recording Montage Module
 
@@ -57,6 +58,15 @@ class MNT_Recording(ModuleBase):
         """
         self.needs_conversion = True
         self.montage.reset()
+
+    def process_event(self, event):
+        """
+        Handle events from attached receivers
+        :param event: ModuleEvent
+        """
+        if event.type == EventType.COMMAND:
+            if event.status_field == "setDefault":
+                self.setDefault()
 
     def getMontageList(self):
         return self.montage.get_configuration_table(self.current_input_params.channel_properties)
@@ -493,10 +503,7 @@ class _ConfigurationPane(QFrame):
         self.gridLayout.addWidget(self.channeltableOther, 3, 0, 1, 3)
 
         # actions
-        # self.connect(self.channeltableEeg, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
         self.channeltableEeg.dataChanged.connect(self._configurationDataChanged)
-
-        # self.connect(self.channeltableOther, Qt.SIGNAL("dataChanged()"), self._configurationDataChanged)
         self.channeltableOther.dataChanged.connect(self._configurationDataChanged)
 
     def validateEEGChannelLabel(self, row, col, data):

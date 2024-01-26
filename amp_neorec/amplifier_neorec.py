@@ -21,7 +21,7 @@ from scipy import signal
 from res import frmNeoRecOnline
 from res import frmNeoRecConfiguration
 
-from PyQt6.QtWidgets import (QFrame, QApplication)
+from PyQt6.QtWidgets import QFrame, QApplication
 from PyQt6.QtCore import pyqtSignal
 
 
@@ -43,6 +43,7 @@ class AMP_NeoRec(ModuleBase):
         # set default channel configuration
         self.max_eeg_channels = 21  #: number of EEG channels for max. HW configuration
         self.max_aux_channels = 0  #: number of AUX channels for max. HW configuration
+        self.eeg_ch_name = None
 
         self.channel_config = EEG_DataBlock.get_default_properties(self.max_eeg_channels, self.max_aux_channels)
         self.recording_mode = NR_MODE_DATA
@@ -97,6 +98,16 @@ class AMP_NeoRec(ModuleBase):
         self.initialErrorCount = -1
         self.acquisitionTimeoutCounter = 0
         self.test_counter = 0
+
+        # send an event to the storage module to change the amplifier name
+        self.send_event(
+            ModuleEvent(
+                self._object_name,
+                EventType.COMMAND,
+                info="NeoRec",
+                status_field="ChangeAmp"
+            )
+        )
 
     def get_online_configuration(self):
         """ Get the online configuration pane
@@ -203,7 +214,6 @@ class AMP_NeoRec(ModuleBase):
         connected = self.amp.open()
         return connected
 
-
     def _prepare_mode_and_filters(self):
         # translate recording modes
         if self.recording_mode == NR_MODE_DATA:
@@ -246,6 +256,15 @@ class AMP_NeoRec(ModuleBase):
         self.dynamic_range = self.dynamic_ranges[0]  # 150 mV dynamic range
         self.performance_mode = self.performance_modes[NR_BOOST_OPTIMUM]  # mode Optimal
 
+        # set name eeg channels (for NeoRec 21, 21S)
+        self._set_eeg_channel_names()
+
+        # change channels config
+        self.channel_config = EEG_DataBlock.get_default_properties(
+            self.max_eeg_channels,
+            self.max_aux_channels,
+            eeg_ch_names=self.eeg_ch_name
+        )
         for channel in self.channel_config:
             channel.isReference = False
             if channel.group == ChannelGroup.EEG:
@@ -256,11 +275,6 @@ class AMP_NeoRec(ModuleBase):
                 channel.enable = False  # disable all AUX channels
 
         self._set_default_filter()
-
-        # if NeoRec is connected, set the appropriate channel names
-        if self.model is not None:
-            self._set_eeg_channel_names()
-
         self.update_receivers()
 
     def _online_mode_changed(self, new_mode):
@@ -368,13 +382,15 @@ class AMP_NeoRec(ModuleBase):
                 )
             )
             raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
-        # check and set ble
-        self._check_ble()
 
         # check battery
         ok, level = self._check_battery()
         if not ok:
             raise ModuleError(self._object_name, f"level battery low {level} %!")
+
+        # check and set ble
+        self._check_ble()
+
 
         self.update_receivers()
 
@@ -462,7 +478,6 @@ class AMP_NeoRec(ModuleBase):
                 status_field="BLEUtilization"
             )
         )
-
         pass
 
     def process_output(self):
@@ -521,11 +536,6 @@ class AMP_NeoRec(ModuleBase):
         if self.skip_counter > 0:
             self.skip_counter -= 1
             return None
-
-        # get the initial error counter
-        if self.initialErrorCount < 0:
-            # self.initialErrorCount = self.amp.getDeviceStatus()[1]
-            pass
 
         # down sample required?
         if self.binning > 1:
@@ -682,36 +692,36 @@ class AMP_NeoRec(ModuleBase):
     def set_device_info(self):
         """
         Receive and save information about the type of amplifier connected.
-        :return:
         """
         # set device information (serial number, model)
-        self.sn, self.model = self.amp.getDeviceInformation()
+        model, self.sn = self.amp.getDeviceInformation()
 
-        # if self.model is None or self.model != model:
-        #     self.setDefault()
+        if model is None or model != self.model:
 
-        # send an event to display to adapt the possible number of channels
-        self.send_event(
-            ModuleEvent(
-                self._object_name,
-                EventType.COMMAND,
-                info=self.amp.CountEeg,
-                status_field="ChangedChannelCount"
+            self.model = model
+            self.max_eeg_channels = self.amp.CountEeg
+
+            # reset settings for Montage to display channel names
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.COMMAND,
+                    status_field="setDefault"
+                )
             )
-        )
 
-        # send an event to the storage module to change the amplifier name
-        # send an event to display to adapt the possible number of channels
-        self.send_event(
-            ModuleEvent(
-                self._object_name,
-                EventType.COMMAND,
-                info=NR_Models[self.sn],
-                status_field="ChangeAmp"
+            self.setDefault()
+
+            # send an event to display to adapt the possible number of channels
+            self.send_event(
+                ModuleEvent(
+                    self._object_name,
+                    EventType.COMMAND,
+                    info=self.amp.CountEeg,
+                    status_field="ChangedChannelCount"
+                )
             )
-        )
 
-        self._set_eeg_channel_names()
         self.update_receivers()
 
     def _set_eeg_channel_names(self):
@@ -721,22 +731,12 @@ class AMP_NeoRec(ModuleBase):
         """
         # set amplifier channel names
         if self.model in NR_Models:
-
             if NR_Models[self.model] == "NeoRec 21":
                 # set channel names for NeoRec 21
-                self.channel_config = EEG_DataBlock.get_default_properties(
-                    self.max_eeg_channels,
-                    self.max_aux_channels,
-                    eeg_ch_names=NR_NAME_CHANNEL_EEG21
-                )
-
+                self.eeg_ch_name = NR_NAME_CHANNEL_EEG21
             if NR_Models[self.model] == "NeoRec mini":
                 # set channel names for NeoRec mini
-                self.channel_config = EEG_DataBlock.get_default_properties(
-                    self.max_eeg_channels,
-                    self.max_aux_channels,
-                    eeg_ch_names=NR_NAME_CHANNEL_EEG21S
-                )
+                self.eeg_ch_name = NR_NAME_CHANNEL_EEG21S
 
     def getXML(self):
         """
@@ -778,9 +778,6 @@ class AMP_NeoRec(ModuleBase):
             return  # configuration data not found, leave everything unchanged
 
         cfg = amps[0]  # we should have only one amplifier instance from this type
-
-        # check version, has to be lower or equal than current version
-        # version = cfg.get("version")
 
         # get the values
         try:
@@ -920,8 +917,3 @@ class _OnlineCfgPane(QFrame, frmNeoRecOnline.Ui_frmNeoRecOnline):
             self.pushButtonStartImpedance.setChecked(True)
         else:
             self.pushButtonStop.setChecked(True)
-
-
-if __name__ == "__main__":
-    obj = AMP_NeoRec()
-    print(obj.dynamic_ranges)
