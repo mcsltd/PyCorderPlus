@@ -34,7 +34,6 @@ from PyQt6 import QtCore
 CHAMP_IMP_INVALID = 999900  # INT_MAX
 
 
-# ToDo: find out how this function works
 def GetExceptionTraceBack():
     ''' Get last trace back info as tuple
     @return: tuple(string representation, filename, line number, module)
@@ -691,14 +690,3 @@ class ModuleBase(QObject):
         module will search for matching values
         '''
         return
-
-
-if __name__ == "__main__":
-    obj = ModuleBase(
-        usethread=True,
-        queuesize=1,
-        name="Example",
-        instance=1
-    )
-
-    print(obj)

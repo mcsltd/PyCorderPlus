@@ -21,7 +21,7 @@ from scipy import signal
 from res import frmNeoRecOnline
 from res import frmNeoRecConfiguration
 
-from PyQt6.QtWidgets import (QFrame, QApplication)
+from PyQt6.QtWidgets import QFrame, QApplication
 from PyQt6.QtCore import pyqtSignal
 
 
@@ -383,13 +383,14 @@ class AMP_NeoRec(ModuleBase):
             )
             raise ModuleError(self._object_name, "Lost Bluetooth connection to amplifier!")
 
-        # check and set ble
-        self._check_ble()
-
         # check battery
         ok, level = self._check_battery()
         if not ok:
             raise ModuleError(self._object_name, f"level battery low {level} %!")
+
+        # check and set ble
+        self._check_ble()
+
 
         self.update_receivers()
 
@@ -535,11 +536,6 @@ class AMP_NeoRec(ModuleBase):
         if self.skip_counter > 0:
             self.skip_counter -= 1
             return None
-
-        # get the initial error counter
-        if self.initialErrorCount < 0:
-            # self.initialErrorCount = self.amp.getDeviceStatus()[1]
-            pass
 
         # down sample required?
         if self.binning > 1:
@@ -696,7 +692,6 @@ class AMP_NeoRec(ModuleBase):
     def set_device_info(self):
         """
         Receive and save information about the type of amplifier connected.
-        :return:
         """
         # set device information (serial number, model)
         model, self.sn = self.amp.getDeviceInformation()
@@ -783,9 +778,6 @@ class AMP_NeoRec(ModuleBase):
             return  # configuration data not found, leave everything unchanged
 
         cfg = amps[0]  # we should have only one amplifier instance from this type
-
-        # check version, has to be lower or equal than current version
-        # version = cfg.get("version")
 
         # get the values
         try:
@@ -925,8 +917,3 @@ class _OnlineCfgPane(QFrame, frmNeoRecOnline.Ui_frmNeoRecOnline):
             self.pushButtonStartImpedance.setChecked(True)
         else:
             self.pushButtonStop.setChecked(True)
-
-
-if __name__ == "__main__":
-    obj = AMP_NeoRec()
-    print(obj.dynamic_ranges)

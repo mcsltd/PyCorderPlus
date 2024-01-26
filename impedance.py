@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Impedance Display Module
 
@@ -460,7 +461,3 @@ class DlgImpedance(QDialog, frmImpedanceDisplay.Ui_frmImpedanceDisplay):
         event.accept()
 
 
-
-if __name__ == "__main__":
-    obj = IMP_Display()
-    print(vars(obj))

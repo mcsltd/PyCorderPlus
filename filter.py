@@ -630,13 +630,11 @@ class _ConfigTableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.EditRole.value:
                 if not self._setitem(index.row(), index.column(), value):
                     return False
-                # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
                 self.dataChanged.emit(index, index)
                 return True
             elif role == Qt.ItemDataRole.CheckStateRole.value:
                 if not self._setitem(index.row(), index.column(), value == Qt.CheckState.Checked.value):
                     return False
-                # self.emit(Qt.SIGNAL('dataChanged(QModelIndex, QModelIndex)'), index, index)
                 self.dataChanged.emit(index, index)
                 return True
         return False

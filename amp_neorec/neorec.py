@@ -19,6 +19,8 @@ import platform
 import time
 import numpy as np
 
+NR_VERSION = 0x1000053820000  # 1.0.21378.0 DLL
+
 # NeoRec base sample rate enum
 NR_RATE_125HZ = 0
 NR_RATE_250HZ = 1
@@ -388,10 +390,14 @@ class NeoRec:
         if cnt > 0:
             # get index device with number 1
             self.id = self.lib.nb2GetId(0)
-            # open this device
-            err = self.lib.nb2Open(self.id)
-            if err == NR_ERR_OK:
-                self.connected = True
+
+            try:
+                # open this device
+                err = self.lib.nb2Open(self.id)
+                if err == NR_ERR_OK:
+                    self.connected = True
+            except:
+                self.connected = False
         return self.connected
 
     def getDeviceInformation(self):
@@ -405,8 +411,11 @@ class NeoRec:
         if not self.connected:
             raise AmpError("device is not open")
 
-        # get DLL version
+        # get and check DLL version
         self.ampversion.read(self.lib, self.id)
+        if self.ampversion.DLL() != NR_VERSION:
+            raise AmpError("wrong NeoRec DLL version (%X / %X)" % (self.ampversion.DLL(),
+                                                                   NR_VERSION))
 
         # get information about open device
         err = self.lib.nb2GetInformation(self.id, ctypes.byref(self.deviceinfo))
@@ -734,6 +743,7 @@ class NeoRec:
         """
         if self.lib is None:
             raise AmpError("library nb2mcs_x64.dll not available")
+
         if self.id == 0:
             connected = False
             return 0, connected
@@ -778,7 +788,6 @@ class NeoRec:
         # channel order in buffer is CH1,CH2..CHn, GND
         items = self.CountEeg + 1
         return np.fromstring(self.impbuffer, np.uint32, items), connected
-
 
 # if __name__ == "__main__":
 #     obj = NeoRec()

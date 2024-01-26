@@ -696,7 +696,6 @@ class ActiChamp:
         if err != CHAMP_ERR_OK:
             raise AmpError("failed to stop device", err)
 
-
     def getEmulationMode(self):
         """
         Lookup emulation and PLL configuration flag in INI file
@@ -708,10 +707,8 @@ class ActiChamp:
             ini = configparser.ConfigParser()
             if self.x64:
                 filename = r"amp_actichamp/ActiChamp_x64.dll.ini"
-                # filename = "ActiChamp_x64.dll.ini"
             else:
                 filename = r"amp_actichamp/ActiChamp_x86.dll.ini"
-                # filename = "ActiChamp_x86.dll.ini"
 
             if len(ini.read(filename)) > 0:
                 emulation = ini.getint("Main", "Emulation")
@@ -904,37 +901,6 @@ class ActiChamp:
             adjust = np.iinfo(np.uint32).max + 1
             self.sampleCounterAdjust += adjust
             sct[:, wrapIndex:] += adjust
-
-        # Test Signal Generator
-        # use internal signal generator?
-        # if PYSIGGEN and self.EmulationMode:
-        #     if not len(self.DummySignals):
-        #         # create dummy signals at the first read
-        #         sg = SignalGenerator(np.float)
-        #         sr = sample_rate[self.settings.Rate]
-        #         numchannels = eegcount + auxcount
-        #         '''
-        #         t, self.DummySignals = sg.GetSineWaveBuffers(numchannels,
-        #                                                      5.0, sr/40/numchannels ,
-        #                                                      100.0, 10.0,
-        #                                                      sr)
-        #         '''
-        #         t, self.DummySignals = sg.GetSineWaveBuffers(numchannels,
-        #                                                      [1.0, 2.0, 3.7, 5.0, 10.0, 17.2, 20.0, 50.0, 100.0, 200.0],
-        #                                                      1.0,
-        #                                                      100.0, 0.0,
-        #                                                      sr)
-        #     # replace eeg with generated signals
-        #     sc32 = np.array(sct[0], dtype=np.int)
-        #     for c in range(len(eeg)):
-        #         eeg[c] = np.take(self.DummySignals[c], sc32, mode="wrap")
-        #
-        #     # write trigger every 10s
-        #     tr = sample_rate[self.settings.Rate] * 10
-        #     trIdx = np.nonzero((sc32 % tr) < 3)[0]
-        #     trg[0] = 0
-        #     if trIdx.size:
-        #         trg[0, trIdx] = 1
 
         d = []
         d.append(eeg)
@@ -1261,30 +1227,3 @@ class ActiChamp:
         if err != CHAMP_ERR_OK:
             raise AmpError("failed to set MyButton LED", err)
 
-
-if __name__ == "__main__":
-    obj = ActiChamp()
-
-    obj.open()
-
-    obj.setup(
-        mode=CHAMP_MODE_NORMAL,
-        rate=CHAMP_RATE_500HZ,
-        binning=1
-    )
-    print("*")
-    obj.start()
-
-    for i in range(5):
-        time.sleep(0.1)
-        # try:
-        d = obj.read(
-            indices=np.array([0, 1]),
-            eegcount=2,
-            auxcount=0
-        )
-        print(d)
-        # except Exception as err:
-        #     print(err)
-    obj.stop()
-    obj.close()

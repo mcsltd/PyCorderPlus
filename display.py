@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Display Module
 
@@ -339,7 +340,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
             pc = Qwt.QwtPlotCurve(title)
             pc.setPen(QPen(color, 0))
             pc.setYAxis(Qwt.QwtPlot.yLeft)
-            # pc.setCurveAttribute(Qwt.QwtPlotCurve.PaintFiltered)
             pc.attach(self)
             self.traces.append(pc)
 
@@ -648,7 +648,6 @@ class _ScopeLegend(Qwt.QwtLegend):
         sz.setHeight(200)
         sz.setWidth(width)
         return sz
-
 
     # def layoutContents(self):
     #     topMargin = self.parent().layout().canvasMargin(Qwt.QwtPlot.xTop)
