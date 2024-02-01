@@ -14,6 +14,8 @@ This file is part of PyCorderPlus
 
 import ctypes
 import ctypes.wintypes
+import os.path
+
 import _ctypes
 import platform
 import time
@@ -353,14 +355,17 @@ class NeoRec:
         """
         # load NeoRec 64 bit windows library
         try:
+            path = os.path.dirname(os.path.abspath(__file__))
             # unload existing library
             if self.lib is not None:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                self.lib = ctypes.windll.LoadLibrary(r"./amp_neorec/nb2mcs_x64.dll")
+                path += r"\nb2mcs_x64.dll"
+                self.lib = ctypes.windll.LoadLibrary(path)
             else:
-                self.lib = ctypes.windll.LoadLibrary(r"./amp_neorec/nb2mcs_x86.dll")
+                path += r"\nb2mcs_x86.dll"
+                self.lib = ctypes.windll.LoadLibrary(path)
         except:
             self.lib = None
             if self.x64:

@@ -21,6 +21,7 @@ import numpy as np
 import time
 import configparser
 import platform
+import os
 
 # max integer
 INT32_MAX = 2 ** 31 - 1
@@ -520,16 +521,17 @@ class ActiChamp:
         """
         # load ActiChamp 32 or 64 bit windows library
         try:
+            path = os.path.dirname(os.path.abspath(__file__))
             # unload existing library
             if self.lib is not None:
                 _ctypes.FreeLibrary(self.lib._handle)
                 # load/reload library
             if self.x64:
-                path = r"amp_actichamp/ActiChamp_x64.dll"
+                path += r"\ActiChamp_x64.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
                 self.lib.champOpen.restype = ctypes.c_uint64
             else:
-                path = r"amp_actichamp/ActiChamp_x86.dll"
+                path += r"\ActiChamp_x86.dll"
                 self.lib = ctypes.windll.LoadLibrary(path)
         except:
             self.lib = None
@@ -705,10 +707,11 @@ class ActiChamp:
         modules = 0
         try:
             ini = configparser.ConfigParser()
+            filename = os.path.dirname(os.path.abspath(__file__))
             if self.x64:
-                filename = r"amp_actichamp/ActiChamp_x64.dll.ini"
+                filename += r"\ActiChamp_x64.dll.ini"
             else:
-                filename = r"amp_actichamp/ActiChamp_x86.dll.ini"
+                filename += r"\ActiChamp_x86.dll.ini"
 
             if len(ini.read(filename)) > 0:
                 emulation = ini.getint("Main", "Emulation")
@@ -1109,10 +1112,11 @@ class ActiChamp:
 
         # write new settings to INI file
         ini = configparser.ConfigParser()
+        filename = os.path.dirname(os.path.abspath(__file__))
         if self.x64:
-            filename = "amp_actichamp/ActiChamp_x64.dll.ini"
+            filename += r"\ActiChamp_x64.dll.ini"
         else:
-            filename = "amp_actichamp/ActiChamp_x86.dll.ini"
+            filename += r"\ActiChamp_x86.dll.ini"
 
         if len(ini.read(filename)) > 0:
             if modules > 0:
