@@ -44,8 +44,8 @@ C:\User\Name\PyCorderPlus> run.bat
 Alternative way to run the program:
 
 ```commandline
-C:\User\Name\PyCorderPlus> ./venv/Scripts/activate
-C:\User\Name\PyCorderPlus> python -m main.py
+C:\User\Name\PyCorderPlus> .\venv\Scripts\activate
+C:\User\Name\PyCorderPlus> python -m main
 ```
 
 
@@ -60,7 +60,7 @@ C:\User\Name\PyCorderPlus> python -m main.py
 
 
 ### Requirements
-* Python >= 3.11
+* Python 3.11
 
 ### System requirements
 * OS: Windows 10, 11

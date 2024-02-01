@@ -1,2 +1,3 @@
-./venv/Scripts/activate
-python -m main.py
+@echo off
+call .\venv\Scripts\activate
+python -m main
