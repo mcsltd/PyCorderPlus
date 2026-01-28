@@ -179,7 +179,7 @@ class StorageVision(ModuleBase):
                 f = d.flatten().astype(np.float32)
                 sizeof_item = f.dtype.itemsize  # item size in bytes
                 write_items = len(f)  # number of items to write
-                nitems = self.libc.fwrite(f.tostring(), sizeof_item, write_items, self.data_file)
+                nitems = self.libc.fwrite(f.tobytes(), sizeof_item, write_items, self.data_file)
                 if nitems != write_items:
                     raise ModuleError(self._object_name, "Write to file %s failed" % self.file_name)
                 # write marker
