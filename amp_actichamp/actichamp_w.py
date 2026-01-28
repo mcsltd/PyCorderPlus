@@ -859,7 +859,7 @@ class ActiChamp:
             items = int(bytesread / np.dtype(np.int32).itemsize)
 
         # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
-        x = np.fromstring(self.buffer, dtype=np.int32, count=items)
+        x = np.frombuffer(self.buffer, dtype=np.int32, count=items)
 
         # shape and transpose to 1st axis is channel and 2nd axis is sample
         samplesize = self.properties.CountEeg + self.properties.CountAux + 1 + 1
@@ -1176,7 +1176,7 @@ class ActiChamp:
 
         # channel order in buffer is CH1,CH2..CHn, GND
         items = self.properties.CountEeg + 1
-        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+        return np.frombuffer(self.impbuffer, np.uint32, items), disconnected
 
     def setImpedanceRange(self, good, bad):
         """ set ActiCap impedance range
