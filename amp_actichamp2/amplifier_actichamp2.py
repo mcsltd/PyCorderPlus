@@ -15,6 +15,7 @@ This file is part of PyCorderPlus
 import time
 from operator import itemgetter
 
+import numpy as np
 from scipy import signal
 from PyQt6.QtWidgets import (QFrame,
                              QApplication,
@@ -190,35 +191,37 @@ class AMP_ActiChamp2(ModuleBase):
         # get all eeg channel indices
         mask = lambda x: (x.group == ChannelGroup.EEG) and (x.input <= self.amp.properties.CountEeg)
         eeg_map = np.array(list(map(mask, self.channel_config)))
-        self.eeg_indices = np.nonzero(eeg_map)[0]  # indices of all eeg channels
+        self.eeg_indices = np.nonzero(eeg_map)[0]      # indices of all eeg channels
+        self.property_indices = self.eeg_indices
 
         # get all aux channel indices
         mask = lambda x: (x.group == ChannelGroup.AUX) and (x.input <= self.amp.properties.CountAux)
-        eeg_map = np.array(list(map(mask, self.channel_config)))
-        self.aux_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
-        self.property_indices = np.append(self.eeg_indices, self.aux_indices)
+        aux_map = np.array(list(map(mask, self.channel_config)))
+        self.aux_indices = np.nonzero(aux_map)[0]   # indices of all aux channels
+        self.property_indices = np.append(self.property_indices, self.aux_indices)
 
         # get all exg channel indices
         mask = lambda x: (x.group == ChannelGroup.EXG) and (x.input <= self.amp.properties.CountExG)
-        eeg_map = np.array(list(map(mask, self.channel_config)))
-        self.exg_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
-        self.property_indices = np.append(self.eeg_indices, self.exg_indices)
+        exg_map = np.array(list(map(mask, self.channel_config)))
+        self.exg_indices = np.nonzero(exg_map)[0]  # indices of all aux channels
+        self.property_indices = np.append(self.property_indices, self.exg_indices)
 
         # get all ref channel indices
         mask = lambda x: (x.group == ChannelGroup.REF) and (x.input <= self.amp.properties.CountRef)
-        eeg_map = np.array(list(map(mask, self.channel_config)))
-        self.ref_indices = np.nonzero(eeg_map)[0]  # indices of all aux channels
-        self.property_indices = np.append(self.eeg_indices, self.ref_indices)
+        ref_map = np.array(list(map(mask, self.channel_config)))
+        self.ref_indices = np.nonzero(ref_map)[0]  # indices of ref channel
+        self.property_indices = np.append(self.property_indices, self.ref_indices)
 
         # adjust AUX indices to the actual available EEG channels
         self.aux_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg)
-        self.channel_indices = np.append(self.eeg_indices, self.aux_indices)
+        self.exg_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg - self.amp.properties.CountExG)
+        self.ref_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg - self.amp.properties.CountExG - self.amp.properties.CountRef)
 
-        # ToDo: adjust REF/EXG indices to the actual available EEG channels ???
+        self.channel_indices = np.hstack((self.eeg_indices, self.aux_indices, self.exg_indices, self.ref_indices))
 
         # create a new data block based on channel selection
         self.eeg_data = EEG_DataBlock(eeg=len(self.eeg_indices), aux=len(self.aux_indices),
-                                      ref=len(self.ref_indices), exg=len(self.exg_indices))
+                                      exg=len(self.exg_indices), ref=len(self.ref_indices))
         self.eeg_data.channel_properties = copy.deepcopy(self.channel_config[self.property_indices])
         self.eeg_data.sample_rate = self.sample_rate['value']
 
