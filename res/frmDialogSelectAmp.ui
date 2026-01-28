@@ -48,32 +48,29 @@
      <property name="title">
       <string>Select Amplifier Type</string>
      </property>
-     <widget class="QRadioButton" name="radioButton">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>50</y>
-        <width>391</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>ActiCHamp Plus</string>
-      </property>
-     </widget>
-     <widget class="QRadioButton" name="radioButton_2">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>100</y>
-        <width>391</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>NeoRec (NeoRec cap, NeoRec 21)</string>
-      </property>
-     </widget>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <widget class="QRadioButton" name="radioButtonActicPlus">
+        <property name="text">
+         <string>ActiCHamp Plus</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QRadioButton" name="radioButtonActic2">
+        <property name="text">
+         <string>ActiCHamp2</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QRadioButton" name="radioButtonNeoRec">
+        <property name="text">
+         <string>NeoRec (NeoRec cap, NeoRec 21)</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>

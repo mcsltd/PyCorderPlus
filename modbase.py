@@ -132,8 +132,8 @@ class ChannelGroup:
     @ivar AUX: channel belongs to AUX channel group
     @ivar EPP: channel belongs to EPP (EP-PreAmp) group
     """
-    (EEG, AUX, EPP, BIP) = range(4)
-    Name = ["EEG", "AUX", "EPP", "BIP"]
+    (EEG, AUX, EXG, REF, EPP, BIP) = range(6)
+    Name = ["EEG", "AUX", "EXG", "REF", "EPP", "BIP"]
 
 
 class EEG_ChannelProperties:
@@ -243,14 +243,14 @@ class EEG_DataBlock:
     ''' Block of EEG data, channel properties, marker and impedance values
     '''
 
-    def __init__(self, eeg=32, aux=8):
+    def __init__(self, eeg=32, aux=8, exg=2, ref=1):
         ''' Set default values for requested number of channels
         @param eeg: number of EEG channels for this block
         @param aux: number of AUX channels for this block
         '''
         self.sample_counter = 0  #: total number of received samples
         self.sample_rate = 500.0  #: sample rate in Hz
-        self.eeg_channels = np.zeros((eeg + aux, 1000), 'd')  #: channel data for EEG and AUX
+        self.eeg_channels = np.zeros((eeg + aux + exg + ref, 1000), 'd')  #: channel data for EEG and AUX
         self.trigger_channel = np.zeros((1, 1000), np.uint32)  #: trigger values
         self.sample_channel = np.zeros((1, 1000), np.uint64)  #: sample counter
         self.channel_properties = self.get_default_properties(eeg, aux)  #: channel properties
@@ -297,7 +297,7 @@ class EEG_DataBlock:
         return 0
 
     @classmethod
-    def get_default_properties(cls, eeg, aux, eeg_ch_names=None):
+    def get_default_properties(cls, eeg, aux, exg=0, ref=0, eeg_ch_names=None):
         ''' Get an property array with default settings
         @param eeg: number of EEG channels
         @param aux: number of AUX channels
@@ -316,6 +316,7 @@ class EEG_DataBlock:
             ch.group = ChannelGroup.EEG
             ch.input = c + 1
             channel_properties.append(ch)
+
         for c in range(0, aux):
             # AUX channels
             ch = EEG_ChannelProperties("Aux%d" % (c + 1))
@@ -323,6 +324,23 @@ class EEG_DataBlock:
             ch.group = ChannelGroup.AUX
             ch.input = c + 1
             channel_properties.append(ch)
+
+        for c in range(0, exg):
+            # EXG channels
+            ch = EEG_ChannelProperties("ExG%d" % (c + 1))
+            ch.inputgroup = ChannelGroup.EXG
+            ch.group = ChannelGroup.EXG
+            ch.input = c + 1
+            channel_properties.append(ch)
+
+        for c in range(0, exg):
+            # Ref channels
+            ch = EEG_ChannelProperties("Ref%d" % (c + 1))
+            ch.inputgroup = ChannelGroup.REF
+            ch.group = ChannelGroup.REF
+            ch.input = c + 1
+            channel_properties.append(ch)
+
         return np.array(channel_properties)
 
 

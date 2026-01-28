@@ -173,7 +173,6 @@ class DISP_Scope(qwt.QwtPlot, ModuleBase):
                 self.online_cfg.adapt_group_size(event.info)
                 self.online_cfg.set_groupsize(self.default_group_size)
 
-
     def process_update(self, params):
         ''' Channel properties have changed, module needs update
         @param params: EEG_DataBlock with channel properties
