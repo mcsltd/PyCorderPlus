@@ -321,29 +321,6 @@ class AmpVersion:
             return False
         return True
 
-    # def isValid(self):
-    #     """ Validate major firmware versions
-    #     @return: True if valid (or emulated), False if not
-    #     """
-    #     if self.boardRevision == 4:
-    #         if self.version.USBCTRL != 0 and self.version.USBCTRL & 0xFF000000 != CHAMP_4_VERSION_CTRL & 0xFF000000:
-    #             return False
-    #         if self.version.FPGA != 0 and self.version.FPGA & 0xFF000000 != CHAMP_4_VERSION_FPGA & 0xFF000000:
-    #             return False
-    #         if self.version.DSP != 0 and self.version.DSP & 0xFF000000 != CHAMP_4_VERSION_DSP & 0xFF000000:
-    #             return False
-    #
-    #     if self.boardRevision == 6:
-    #         if self.versionext.USBCTRL != 0 and self.versionext.USBCTRL & 0xFF000000 != CHAMP_6_VERSION_CTRL & 0xFF000000:
-    #             return False
-    #         if self.versionext.FPGAM != 0 and self.versionext.FPGAM & 0xFF000000 != CHAMP_6_VERSION_FPGAM & 0xFF000000:
-    #             return False
-    #         if self.versionext.FPGAC != 0 and self.versionext.FPGAC & 0xFF000000 != CHAMP_6_VERSION_FPGAC & 0xFF000000:
-    #             return False
-    #         if self.versionext.DSP != 0 and self.versionext.DSP & 0xFF000000 != CHAMP_6_VERSION_DSP & 0xFF000000:
-    #             return False
-    #     return True
-
     def _getVersionString(self, rawversion):
         """ get readable version string from DWORD
         @param rawversion: raw version number from DLL
@@ -1128,7 +1105,7 @@ class ActiChamp2:
 
         # channel order in buffer is CH1,CH2..CHn, GND
         items = self.properties.CountEeg + 1
-        return np.fromstring(self.impbuffer, np.uint32, items), disconnected
+        return np.frombuffer(self.impbuffer, np.uint32, items), disconnected
 
     def setImpedanceRange(self, good, bad):
         """ set ActiCap impedance range

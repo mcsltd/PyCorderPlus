@@ -72,7 +72,7 @@ def InstantiateModules(name_amp):
         modules = [
             AMP_ActiChamp(),
             MNT_Recording(),
-            # TRG_Eeg(),
+            TRG_Eeg(),
             StorageVision(),
             FLT_Eeg(),
             IMP_Display(),
@@ -83,7 +83,7 @@ def InstantiateModules(name_amp):
         modules = [
             AMP_ActiChamp2(),
             MNT_Recording(),
-            # TRG_Eeg(),
+            TRG_Eeg(),
             StorageVision(),
             FLT_Eeg(),
             IMP_Display(),
@@ -94,7 +94,7 @@ def InstantiateModules(name_amp):
         modules = [
             AMP_NeoRec(),
             MNT_Recording(),
-            # TRG_Eeg(),
+            TRG_Eeg(),
             StorageVision(),
             FLT_Eeg(),
             IMP_Display(),
