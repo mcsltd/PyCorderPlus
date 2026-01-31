@@ -7,6 +7,7 @@ PyCorderPlus supports the following amplifiers:
 * [NeoRec 21](https://mcscap.com/catalog/mobile-system-neorec-cap-21/system-neorec-cap-21-professional/)
 * [NeoRec 21 mini](https://mcscap.com/catalog/mobile-system-neorec-cap-21-mini/system-neorec-cap-21-mini-professional/)
 * [actiCHamp Plus](https://brainvision.com/products/actichamp-plus/)
+* actiCHamp 2
 
 ## Functional
 
@@ -49,8 +50,6 @@ C:\User\Name\PyCorderPlus> python -m main
 ```
 
 
-
-
 ## Dependencies
 
 ### Amplifier Drivers
@@ -60,7 +59,7 @@ C:\User\Name\PyCorderPlus> python -m main
 
 
 ### Requirements
-* Python 3.11
+* Python >3.11
 
 ### System requirements
 * OS: Windows 10, 11
@@ -72,15 +71,19 @@ You can find other requirements for the library in the [requirements.txt](requir
 ### Main code base
 Copyright © 2010, Brain Products GmbH, Gilching, for original PyCorder modules
 
-Copyright © 2024, Medical Computer Systems Ltd, for modules rewritten to a new version of Python
+Copyright © 2026, Medical Computer Systems Ltd, for modules rewritten to a new version of Python
 
 ### PyCorderPlus NeoRec Recorder
-Copyright © 2024, Medical Computer Systems Ltd, for modules for receiving and processing data from NeoRec amplifiers
+Copyright © 2026, Medical Computer Systems Ltd, for modules for receiving and processing data from NeoRec amplifiers
 
 ## License
 See included [LICENSE](LICENSE) file for more details about licensing terms.
 
 ## Release History
+### v1.0.1
+* Added support for actiCHamp2.
+* Support for new python versions.
+
 ### v1.0.0
 * Modules completely rewritten: `modbase.py`, `storage.py`, `impedance.py`, `filter.py`, `tools.py`, `trigger.py`.
 * Modules partially rewritten: `amplifier_actichamp.py`, `actichamp_w.py`, `display.py`.

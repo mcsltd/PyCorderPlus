@@ -57,7 +57,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 NAME_APPLICATION = "PyCorderPlus"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def InstantiateModules(name_amp):

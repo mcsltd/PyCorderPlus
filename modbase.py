@@ -133,7 +133,7 @@ class ChannelGroup:
     @ivar EPP: channel belongs to EPP (EP-PreAmp) group
     """
     (EEG, AUX, EXG, REF, EPP, BIP) = range(6)
-    Name = ["EEG", "AUX", "EXG", "REF", "EPP", "BIP"]
+    Name = ["EEG", "AUX", "EXG", "REF", "EPP", "BIP"]   # ToDo: test it ["EEG", "AUX", "EXG", "REF", "EPP", "BIP"]
 
 
 class EEG_ChannelProperties:
