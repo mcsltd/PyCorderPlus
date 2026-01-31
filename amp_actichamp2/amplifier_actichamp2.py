@@ -75,7 +75,7 @@ class AMP_ActiChamp2(ModuleBase):
         # set default channel configuration
         self.max_eeg_channels = 160  #: number of EEG channels for max. HW configuration
         self.max_aux_channels = 8  #: number of AUX channels for max. HW configuration
-        self.max_exg_channels = 2  #: number of ref channels for max. HW configuration
+        self.max_exg_channels = 7  #: number of ref channels for max. HW configuration
         self.max_ref_channels = 1  #: number of exg channels for max. HW configuration
         self.channel_config = EEG_DataBlock.get_default_properties(
             eeg=self.max_eeg_channels, aux=self.max_aux_channels, exg=self.max_exg_channels, ref=self.max_ref_channels)
@@ -214,8 +214,10 @@ class AMP_ActiChamp2(ModuleBase):
 
         # adjust AUX indices to the actual available EEG channels
         self.aux_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg)
-        self.exg_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg - self.amp.properties.CountExG)
-        self.ref_indices -= (self.max_eeg_channels - self.amp.properties.CountEeg - self.amp.properties.CountExG - self.amp.properties.CountRef)
+        self.exg_indices -= (
+                self.max_eeg_channels + self.amp.properties.CountEeg + self.amp.properties.CountAux)
+        self.ref_indices -= (
+                self.max_eeg_channels + self.amp.properties.CountEeg + self.amp.properties.CountAux + self.amp.properties.CountExG)
 
         self.channel_indices = np.hstack((self.eeg_indices, self.aux_indices, self.exg_indices, self.ref_indices))
 

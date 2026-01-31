@@ -397,7 +397,7 @@ class ActiChamp2:
         self.properties.CountEeg = 32
         self.properties.CountAux = 8
         self.properties.CountRef = 1
-        self.properties.CountExG = 2
+        self.properties.CountExG = 7    # incorrect value must be 2
         self.properties.TriggersIn = 8
         self.properties.TriggersOut = 8
         self.properties.Rate = 10000.0
@@ -412,7 +412,6 @@ class ActiChamp2:
 
         # get and check DLL version
         self.ampversion.read(self.lib, self.devicehandle)
-
 
         if self.ampversion.DLL() != CHAMP_VERSION:
             pass
@@ -504,6 +503,7 @@ class ActiChamp2:
         # get device module connection info
         self.modulestate.Enabled = 0
         self.modulestate.Present = 0
+
         self.lib.champGetModules(self.devicehandle, ctypes.byref(self.modulestate))
 
         # get device properties
@@ -781,7 +781,7 @@ class ActiChamp2:
         # channel order in buffer is S1CH1,S1CH2..S1CHn, S2CH1,S2CH2,..S2nCHn, ...
         x = np.frombuffer(self.buffer, dtype=np.int32, count=items)
 
-        # shape and transpose to 1st axis is channel and 2nd axis is sample
+        # shape and transpose
         samplesize = self.properties.CountEeg + self.properties.CountAux + self.properties.CountRef + self.properties.CountExG + 1 + 1 + 1
         x.shape = (-1, samplesize)
         y = x.transpose()
@@ -795,20 +795,20 @@ class ActiChamp2:
         disconnected = None  # not possible yet
 
         # extract and scale the different channel types
-        eegscale = self.properties.ResolutionEegRef * 1e6  # convert to µV
-        eeg[index:eegcount] = eeg[index:eegcount] * eegscale
+        eeg_ref_scale = self.properties.ResolutionEegRef * 1e6  # convert to µV
+        aux_exg_scale = self.properties.ResolutionAuxExG * 1e6  # convert to µV
+
+        # scale eeg
+        eeg[index:eegcount] = eeg[index:eegcount] * eeg_ref_scale
         index += eegcount
-
-        auxscale = self.properties.ResolutionAuxExG * 1e6  # convert to µV
-        eeg[index:index + auxcount] = eeg[index:index + auxcount] * auxscale
+        # scale aux
+        eeg[index:index + auxcount] = eeg[index:index + auxcount] * aux_exg_scale
         index += auxcount
-
-        refscale = self.properties.ResolutionEegRef * 1e6 # convert to µV
-        eeg[index:index + refcount] = eeg[index:index + refcount] * refscale
+        # ref
+        eeg[index:index + refcount] = eeg[index:index + refcount] * eeg_ref_scale
         index += refcount
-
-        exgscale = self.properties.ResolutionAuxExG * 1e6  # convert to µV
-        eeg[index:index + exgcount] = eeg[index:index + exgcount] * exgscale
+        # exg
+        eeg[index:index + exgcount] = eeg[index:index + exgcount] * aux_exg_scale
 
         # extract trigger channel
         index = self.properties.CountEeg + self.properties.CountAux + self.properties.CountRef + self.properties.CountExG
