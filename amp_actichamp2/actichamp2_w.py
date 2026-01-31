@@ -262,6 +262,17 @@ class t_champModules(ctypes.Structure):
     _fields_ = [('Present', ctypes.c_uint),  # Bits indicate that the module is present in hardware
                 ('Enabled', ctypes.c_uint)]  # Bits indicate that the module is enabled for use
 
+class t_champBatteryParameters(ctypes.Structure):
+    """ C Amplifier battery parameters structure """
+    _pack_ = 1
+    _fields_ = [
+        ("Capacity", ctypes.c_float),
+        ("Level", ctypes.c_float),
+        ("Cell", ctypes.c_float),
+        ("Batt", ctypes.c_float),
+        ("Current", ctypes.c_float),
+        ("Temperature", ctypes.c_float)
+    ]
 
 class CHAMP_PLL(ctypes.Structure):
     """ C PLL Parameters
@@ -409,6 +420,9 @@ class ActiChamp2:
         # load ActiChamp 32 or 64 bit windows library
         self.lib = None
         self.loadLib()
+
+        # flag for battery level func
+        self.battery_level_enabled = True
 
         # get and check DLL version
         self.ampversion.read(self.lib, self.devicehandle)
@@ -945,6 +959,39 @@ class ActiChamp2:
                     faultyVoltages.append("%s=%.1fV" % (idx, u))
 
         return state, voltages, faultyVoltages
+
+    def getBatteryLevel(self) -> (int, float):
+        """ Read the amplifier battery level
+        @return: state (0=ok, 1=critical, 2=bad, -5=not implemented) and percent battery level
+        """
+        params = t_champBatteryParameters()
+        status, level = 0, params.Level
+        if self.devicehandle == 0:
+            return status, params.Level
+
+        # get params amplifier battery
+        err = self.lib.champGetBatteryParameters(self.devicehandle, params)
+        if err == CHAMP_ERR_SUPPORT:
+            self.battery_level_enabled = False
+            return CHAMP_ERR_SUPPORT, params.Level
+        elif err != CHAMP_ERR_OK:
+            time.sleep(0.005)
+            err = self.lib.champGetBatteryParameters(self.devicehandle, params)
+            if err != CHAMP_ERR_OK:
+                if self.running:
+                    status = 2, params.Level
+                else:
+                    status, level = 0, params.Level
+                return status, level
+
+        # check battery level
+        level = params.Level
+        if level < 15:
+            status = 1
+        elif level < 5:
+            status = 2
+
+        return status, level
 
     @staticmethod
     def getSamplingRateBase(samplingrate):

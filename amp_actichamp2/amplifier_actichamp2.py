@@ -109,6 +109,7 @@ class AMP_ActiChamp2(ModuleBase):
         self.battery_timer = time.process_time()
         self.voltage_warning = ""
 
+
         # skip the first received data blocks
         self.skip_counter = 5
         self.blocking_counter = 0
@@ -414,9 +415,9 @@ class AMP_ActiChamp2(ModuleBase):
         self.amp.open()
 
         # check battery
-        ok, voltage = self._check_battery()
+        ok, battery_info = self._check_battery()
         if not ok:
-            raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
+            raise ModuleError(self._object_name, f"battery low {battery_info}!")
 
         self.amp.setup(self.recording_mode, self.sample_rate['base'], self.sample_rate['div'])
         self.update_receivers()
@@ -424,9 +425,9 @@ class AMP_ActiChamp2(ModuleBase):
             raise ModuleError(self._object_name, "no input channels selected!")
 
         # check battery again
-        ok, voltage = self._check_battery()
+        ok, battery_info = self._check_battery()
         if not ok:
-            raise ModuleError(self._object_name, "battery low (%.1fV)!" % voltage)
+            raise ModuleError(self._object_name, f"battery low {battery_info}!")
 
         # start hardware
         self.amp.start()
@@ -461,10 +462,21 @@ class AMP_ActiChamp2(ModuleBase):
         self.blocking_counter = 0
         self.initialErrorCount = -1
 
-    def _check_battery(self):
+    def _check_battery(self) -> (bool, str):
         """ Check amplifier battery voltages
         @return: state (ok=True, bad=False) and voltage
         """
+        if self.amp.battery_level_enabled:
+            state, level = self.amp.getBatteryLevel()
+            level_info = f"{level:.1f}%"
+            severe = ErrorSeverity.IGNORE
+            if state == 1:
+                severe = ErrorSeverity.NOTIFY
+            elif state == 2:
+                severe = ErrorSeverity.STOP
+            self.send_event(ModuleEvent(self._object_name, EventType.STATUS, info=level_info, severity=severe, status_field="Battery"))
+            return state < 2, level_info
+
         # read battery state and internal voltages from amplifier
         state, voltages, faultyVoltages = self.amp.getBatteryVoltage()
         severe = ErrorSeverity.IGNORE
@@ -482,10 +494,7 @@ class AMP_ActiChamp2(ModuleBase):
                 v_warning += " %s" % u
             # warning already sent?
             if v_warning != self.voltage_warning:
-                self.send_event(ModuleEvent(self._object_name,
-                                            EventType.ERROR,
-                                            info=v_warning,
-                                            severity=severe))
+                self.send_event(ModuleEvent(self._object_name, EventType.ERROR, info=v_warning, severity=severe))
                 pass
         self.voltage_warning = v_warning
 
@@ -493,12 +502,8 @@ class AMP_ActiChamp2(ModuleBase):
         voltage_info = "%.2fV" % voltages.VDC  # battery voltage
         for u in faultyVoltages:
             voltage_info += "\n%s" % u
-        self.send_event(ModuleEvent(self._object_name,
-                                    EventType.STATUS,
-                                    info=voltage_info,
-                                    severity=severe,
-                                    status_field="Battery"))
-        return state < 2, voltages.VDC
+        self.send_event(ModuleEvent(self._object_name, EventType.STATUS, info=voltage_info, severity=severe, status_field="Battery"))
+        return state < 2, voltage_info
 
     def process_stop(self):
         """
