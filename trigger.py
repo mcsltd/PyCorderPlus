@@ -67,11 +67,14 @@ class TRG_Eeg(ModuleBase):
         """
         # search for trigger events
         if in_out == 0:
-            trigger = np.bitwise_and(self.data.trigger_channel[0], 0x000F)  # mask trigger input channels 0-3
+            trigger_raw = np.bitwise_and(self.data.trigger_channel[0], 0x000F)  # mask trigger input channels 0-3
         elif in_out == 1:
-            trigger = np.bitwise_and(self.data.trigger_channel[0], 0x00F0)  # mask trigger input channels 4-7
+            trigger_raw = np.bitwise_and(self.data.trigger_channel[0], 0x00F0)  # mask trigger input channels 4-7
         else:
-            trigger = np.bitwise_and(self.data.trigger_channel[0], 0xFF00)  # mask trigger output channels
+            trigger_raw = np.bitwise_and(self.data.trigger_channel[0], 0xFF00)  # mask trigger output channels
+
+        # Преобразуем к знаковому типу для работы с -1
+        trigger = trigger_raw.astype(np.int32)
         lastevent = self.lastevent[in_out]
 
         diff = np.diff(np.r_[-1, trigger])  # get changes
@@ -122,7 +125,10 @@ class TRG_Eeg(ModuleBase):
         Search for button events
         """
         # mask button input bit
-        button = np.bitwise_and(self.data.trigger_channel[0], 0x80000000)
+        button_raw = np.bitwise_and(self.data.trigger_channel[0], 0x80000000)
+        # Преобразуем к знаковому типу
+        button = button_raw.astype(np.int64)  # Используем int64 чтобы вместить большие значения
+
         # search changes
         diff = np.diff(np.r_[-1, button])  # get changes
         idx = np.nonzero(diff)[0]  # indices of changes

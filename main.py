@@ -29,6 +29,8 @@ from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import QDir, QTimer
 from PyQt6.QtBluetooth import QBluetoothLocalDevice
 
+from amp_actichamp2.amplifier_actichamp2 import AMP_ActiChamp2
+
 """
 Import GUI resources.
 """
@@ -55,7 +57,7 @@ from trigger import TRG_Eeg
 from filter import FLT_Eeg
 
 NAME_APPLICATION = "PyCorderPlus"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 def InstantiateModules(name_amp):
@@ -76,6 +78,18 @@ def InstantiateModules(name_amp):
             IMP_Display(),
             DISP_Scope(instance=0),
         ]
+
+    elif name_amp == AMP_ActiChamp2.__name__:
+        modules = [
+            AMP_ActiChamp2(),
+            MNT_Recording(),
+            TRG_Eeg(),
+            StorageVision(),
+            FLT_Eeg(),
+            IMP_Display(),
+            DISP_Scope(instance=0),
+        ]
+
     elif name_amp == AMP_NeoRec.__name__:
         modules = [
             AMP_NeoRec(),
@@ -124,9 +138,13 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
         self.statusWidget.signal_showLog.connect(self.showLogEntries)
         self.statusWidget.signal_saveLog.connect(self.saveLogFile)
 
+        # button action for select actichamp2
+        self.actionActiCHamp2 = self.menuSelect_Amplifier.addAction("actiCHamp2")
+
         # buttons action to select amplifier type
-        self.actionActiCHamp_Plus.triggered.connect(self._restart)
-        self.actionNeoRec.triggered.connect(self._restart)
+        self.actionActiCHamp_Plus.triggered.connect(self._on_clicked_acticplus)
+        self.actionNeoRec.triggered.connect(self._on_clicked_neorec)
+        self.actionActiCHamp2.triggered.connect(self._on_clicked_atic2)
 
         # preferences
         self.application_name = "PyCorderPlus"
@@ -169,6 +187,9 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
 
         elif self.topmodule.__class__.__name__ == AMP_ActiChamp.__name__:
             self.actionActiCHamp_Plus.setDisabled(True)
+
+        elif self.topmodule.__class__.__name__ == AMP_ActiChamp2.__name__:
+            self.actionActiCHamp2.setDisabled(True)
 
         # get signal panes for plot area
         self.horizontalLayout_SignalPane.removeItem(self.horizontalLayout_SignalPane.itemAt(0))
@@ -267,17 +288,21 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
             self.topmodule.set_device_info()
             self.updateModuleInfo()
 
-    def _restart(self):
-        """
-        Restart MainWindow for new type amplifier
-        :return:
-        """
-        if self.name_amplifier == AMP_NeoRec.__name__:
-            self.name_amplifier = AMP_ActiChamp.__name__
-        elif self.name_amplifier == AMP_ActiChamp.__name__:
-            self.name_amplifier = AMP_NeoRec.__name__
+    def _on_clicked_neorec(self):
+        self.name_amplifier = AMP_NeoRec.__name__
         self.close()
         QApplication.exit(self.RESTART)
+
+    def _on_clicked_atic2(self):
+        self.name_amplifier = AMP_ActiChamp2.__name__
+        self.close()
+        QApplication.exit(self.RESTART)
+
+    def _on_clicked_acticplus(self):
+        self.name_amplifier = AMP_ActiChamp.__name__
+        self.close()
+        QApplication.exit(self.RESTART)
+
 
     def updateUI(self, isRunning=False):
         """ Update user interface to reflect the recording state
@@ -344,9 +369,7 @@ class MainWindow(QMainWindow, frmMain.Ui_MainWindow):
                 tb = GetExceptionTraceBack()[0]
                 self.processEvent(
                     ModuleEvent(
-                        "Load Configuration",
-                        EventType.ERROR,
-                        tb + " -> %s " % file_name + str(e),
+                        "Load Configuration", EventType.ERROR, tb + " -> %s " % file_name + str(e),
                         severity=ErrorSeverity.NOTIFY
                     )
                 )
@@ -812,19 +835,24 @@ class DlgAmpTypeSelection(frmDialogSelectAmp.Ui_SelectAmps, QDialog):
         self.setupUi(self)
 
         # default selected amplifier
-        self.radioButton.setChecked(True)
+        self.radioButtonActicPlus.setChecked(True)
         self.name_amp = AMP_ActiChamp.__name__
 
         self.buttonBox.clicked.connect(self.set_name)
 
     def set_name(self):
         # set name
-        if self.radioButton.isChecked():
+        if self.radioButtonActicPlus.isChecked():
             self.name_amp = AMP_ActiChamp.__name__
 
+        if self.radioButtonActic2.isChecked():
+            self.name_amp = AMP_ActiChamp2.__name__
+
         # chose amplifier neorec
-        if self.radioButton_2.isChecked():
+        if self.radioButtonNeoRec.isChecked():
             self.name_amp = "AMP_NeoRec"
+
+
 
     def closeEvent(self, event):
         res = QMessageBox.warning(
@@ -1165,7 +1193,8 @@ def main(args):
             if (
                     res == MainWindow.RESTART and win.name_amplifier == AMP_NeoRec.__name__
             ) or (
-                    res != MainWindow.RESTART and win.name_amplifier == AMP_ActiChamp.__name__
+                    res != MainWindow.RESTART and (win.name_amplifier == AMP_ActiChamp.__name__ or
+                                                   win.name_amplifier == AMP_ActiChamp2.__name__)
             ):
                 # show the battery disconnection reminder for actiCHamp
                 DlgBatteryInfo().exec()
