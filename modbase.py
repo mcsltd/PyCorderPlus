@@ -297,15 +297,18 @@ class EEG_DataBlock:
         return 0
 
     @classmethod
-    def get_default_properties(cls, eeg, aux, exg=0, ref=0, eeg_ch_names=None):
+    def get_default_properties(cls, eeg, aux,  ref=0, exg=0, eeg_ch_names=None):
         ''' Get an property array with default settings
         @param eeg: number of EEG channels
         @param aux: number of AUX channels
+        @param ref: number of REF channels
+        @param exg: number of EXG channels
         :param eeg_ch_names: names of EEG channels (only NeoRec)
         '''
         channel_properties = []
-        for c in range(0, eeg):
 
+        # !!! depends on the order of the channels
+        for c in range(0, eeg):
             # EEG channels
             if eeg_ch_names is not None and len(eeg_ch_names) == eeg:
                 ch = EEG_ChannelProperties(eeg_ch_names[c])
@@ -325,15 +328,7 @@ class EEG_DataBlock:
             ch.input = c + 1
             channel_properties.append(ch)
 
-        for c in range(0, exg):
-            # EXG channels
-            ch = EEG_ChannelProperties("ExG%d" % (c + 1))
-            ch.inputgroup = ChannelGroup.EXG
-            ch.group = ChannelGroup.EXG
-            ch.input = c + 1
-            channel_properties.append(ch)
-
-        for c in range(0, exg):
+        for c in range(0, ref):
             # Ref channels
             ch = EEG_ChannelProperties("Ref%d" % (c + 1))
             ch.inputgroup = ChannelGroup.REF
@@ -341,6 +336,13 @@ class EEG_DataBlock:
             ch.input = c + 1
             channel_properties.append(ch)
 
+        for c in range(0, exg):
+            # EXG channels
+            ch = EEG_ChannelProperties("ExG%d" % (c + 1))
+            ch.inputgroup = ChannelGroup.EXG
+            ch.group = ChannelGroup.EXG
+            ch.input = c + 1
+            channel_properties.append(ch)
         return np.array(channel_properties)
 
 
